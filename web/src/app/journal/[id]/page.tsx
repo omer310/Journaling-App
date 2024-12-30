@@ -3,17 +3,18 @@ import { EditJournalClient } from './EditJournalClient';
 
 export const dynamic = 'force-dynamic';
 
-export function generateMetadata({
+export async function generateMetadata({
   params,
 }: {
-  params: { id: string };
-}): Metadata {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const resolvedParams = await params;
   return {
-    title: `Edit Journal Entry - ${params.id}`,
+    title: `Edit Journal Entry - ${resolvedParams.id}`,
   };
 }
 
-export default function Page({
+export default async function Page({
   params,
 }: {
   params: { id: string };
