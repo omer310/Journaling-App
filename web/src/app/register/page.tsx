@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { FirebaseError } from 'firebase/app';
 import { auth } from '@/components/AuthProvider';
+import { SocialAuth } from '@/components/SocialAuth';
 import Link from 'next/link';
 
 export default function RegisterPage() {
@@ -61,6 +62,8 @@ export default function RegisterPage() {
             Start your journaling journey
           </p>
         </div>
+
+        <SocialAuth />
 
         <form className="mt-8 space-y-6" onSubmit={handleRegister}>
           {error && (

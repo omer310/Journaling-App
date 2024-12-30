@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { 
   collection, 
   onSnapshot, 
@@ -14,6 +14,24 @@ import {
 import { auth } from '@/components/AuthProvider';
 
 const db = getFirestore();
+
+// Create a custom storage that checks for window/localStorage availability
+const customStorage = {
+  getItem: (name: string): string | null => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(name);
+  },
+  setItem: (name: string, value: string): void => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(name, value);
+    }
+  },
+  removeItem: (name: string): void => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(name);
+    }
+  },
+};
 
 interface Tag {
   id: string;
@@ -189,38 +207,13 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'soul-pages-storage',
+      storage: createJSONStorage(() => customStorage),
       partialize: (state) => ({
         currentTheme: state.currentTheme,
         customThemes: state.customThemes,
         tags: state.tags,
         pendingSync: state.pendingSync,
       }),
-      storage: {
-        getItem: (name) => {
-          try {
-            const str = localStorage.getItem(name);
-            if (!str) return null;
-            return JSON.parse(str);
-          } catch (error) {
-            console.warn('Failed to get from storage:', error);
-            return null;
-          }
-        },
-        setItem: (name, value) => {
-          try {
-            localStorage.setItem(name, JSON.stringify(value));
-          } catch (error) {
-            console.warn('Failed to save to storage:', error);
-          }
-        },
-        removeItem: (name) => {
-          try {
-            localStorage.removeItem(name);
-          } catch (error) {
-            console.warn('Failed to remove from storage:', error);
-          }
-        },
-      },
     }
   )
 );

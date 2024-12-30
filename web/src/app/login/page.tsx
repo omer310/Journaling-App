@@ -5,7 +5,25 @@ import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { FirebaseError } from 'firebase/app';
 import { auth } from '@/components/AuthProvider';
+import { SocialAuth } from '@/components/SocialAuth';
 import Link from 'next/link';
+
+const getErrorMessage = (error: FirebaseError) => {
+  switch (error.code) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return 'Invalid email or password. Please try again.';
+    case 'auth/invalid-email':
+      return 'Invalid email address. Please enter a valid email.';
+    case 'auth/user-disabled':
+      return 'This account has been disabled. Please contact support.';
+    case 'auth/too-many-requests':
+      return 'Too many failed attempts. Please try again later.';
+    default:
+      return 'Failed to log in. Please try again.';
+  }
+};
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -28,11 +46,14 @@ export default function LoginPage() {
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/journal');
     } catch (error: unknown) {
-      console.error('Login error:', error);
       if (error instanceof FirebaseError) {
-        setError(error.message || 'Failed to log in. Please try again.');
+        // Don't log the error to console in production
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('Login error:', error.code);
+        }
+        setError(getErrorMessage(error));
       } else {
-        setError('Failed to log in. Please try again.');
+        setError('An unexpected error occurred. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -50,6 +71,8 @@ export default function LoginPage() {
             Sign in to continue your journaling journey
           </p>
         </div>
+
+        <SocialAuth />
 
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
           {error && (
