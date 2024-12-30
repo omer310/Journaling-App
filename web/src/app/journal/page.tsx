@@ -14,7 +14,7 @@ export default function JournalPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const { tags, entries, addEntry, addTag } = useStore();
+  const { tags, addEntry, addTag } = useStore();
 
   useEffect(() => {
     // Load draft from localStorage if exists

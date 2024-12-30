@@ -151,7 +151,7 @@ export function Search({
             </div>
           ) : query ? (
             <div className="p-4 text-center text-secondary">
-              No results found for "{query}"
+              No results found for &quot;{query}&quot;
             </div>
           ) : null}
         </div>
