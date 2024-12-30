@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth } from '../services/auth';
+import { storage } from '../services/storage';
 
 const PIN_LENGTH = 4;
 
@@ -15,7 +16,17 @@ export function ChangePINScreen({ onComplete, onCancel }: Props) {
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [step, setStep] = useState<'current' | 'new' | 'confirm'>('current');
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    loadTheme();
+  }, []);
+
+  const loadTheme = async () => {
+    const theme = await storage.getTheme();
+    setIsDarkMode(theme === 'dark');
+  };
 
   const handleNumberPress = async (number: string) => {
     switch (step) {
@@ -127,19 +138,25 @@ export function ChangePINScreen({ onComplete, onCancel }: Props) {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[
+      styles.container,
+      isDarkMode && styles.darkContainer,
+      { paddingTop: insets.top }
+    ]}>
       <View style={styles.header}>
         <Text
-          style={styles.cancelButton}
+          style={[styles.cancelButton, isDarkMode && styles.darkGreenText]}
           onPress={onCancel}
         >
           Cancel
         </Text>
-        <Text style={styles.title}>{getTitle()}</Text>
+        <Text style={[styles.title, isDarkMode && styles.darkText]}>{getTitle()}</Text>
         <View style={styles.placeholder} />
       </View>
 
-      <Text style={styles.subtitle}>{getSubtitle()}</Text>
+      <Text style={[styles.subtitle, isDarkMode && styles.darkSecondaryText]}>
+        {getSubtitle()}
+      </Text>
 
       <View style={styles.dotsContainer}>
         {Array.from({ length: PIN_LENGTH }).map((_, i) => (
@@ -149,7 +166,9 @@ export function ChangePINScreen({ onComplete, onCancel }: Props) {
               styles.dot,
               {
                 backgroundColor:
-                  getCurrentValue().length > i ? '#22c55e' : '#e2e8f0',
+                  getCurrentValue().length > i
+                    ? '#22c55e'
+                    : isDarkMode ? '#333' : '#e2e8f0',
               },
             ]}
           />
@@ -160,12 +179,15 @@ export function ChangePINScreen({ onComplete, onCancel }: Props) {
         {[1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, 'delete'].map((num, index) => (
           <View key={num} style={styles.keypadButton}>
             {num === 'delete' ? (
-              <Text style={styles.deleteButton} onPress={handleDelete}>
+              <Text
+                style={[styles.deleteButton, isDarkMode && styles.darkSecondaryText]}
+                onPress={handleDelete}
+              >
                 ⌫
               </Text>
             ) : num !== '' ? (
               <Text
-                style={styles.number}
+                style={[styles.number, isDarkMode && styles.darkText]}
                 onPress={() => handleNumberPress(num.toString())}
               >
                 {num}
@@ -183,6 +205,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  darkContainer: {
+    backgroundColor: '#1a1a1a',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -196,9 +221,15 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     textAlign: 'center',
   },
+  darkText: {
+    color: '#fff',
+  },
   cancelButton: {
     fontSize: 16,
     color: '#22c55e',
+  },
+  darkGreenText: {
+    color: '#4ade80',
   },
   placeholder: {
     width: 50,
@@ -208,6 +239,9 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginBottom: 32,
+  },
+  darkSecondaryText: {
+    color: '#999',
   },
   dotsContainer: {
     flexDirection: 'row',

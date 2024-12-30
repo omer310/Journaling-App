@@ -32,9 +32,9 @@ export default function RegisterPage() {
       setError('');
       await createUserWithEmailAndPassword(auth, email, password);
       router.push('/journal');
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error('Registration error:', error);
-      setError(error.message || 'Failed to create account');
+      setError('Failed to register. Please try again.');
     } finally {
       setLoading(false);
     }

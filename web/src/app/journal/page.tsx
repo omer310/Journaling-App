@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import { createEntry, updateEntry } from '@/lib/journal';
+import { createEntry } from '@/lib/journal';
 import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
 

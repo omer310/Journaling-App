@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth } from '../services/auth';
+import { storage } from '../services/storage';
 
 const PIN_LENGTH = 4;
 
@@ -20,7 +21,25 @@ export function SetupPINScreen({ onComplete }: Props) {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [step, setStep] = useState<'create' | 'confirm'>('create');
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    loadTheme();
+    checkExistingPIN();
+  }, []);
+
+  const loadTheme = async () => {
+    const theme = await storage.getTheme();
+    setIsDarkMode(theme === 'dark');
+  };
+
+  const checkExistingPIN = async () => {
+    const existingPIN = await auth.getPIN();
+    if (existingPIN) {
+      onComplete(); // Skip PIN setup if already exists
+    }
+  };
 
   const handleNumberPress = async (number: string) => {
     Vibration.vibrate(40); // Short vibration for feedback
@@ -82,16 +101,20 @@ export function SetupPINScreen({ onComplete }: Props) {
       onPress={() => handleNumberPress(num.toString())}
       activeOpacity={0.7}
     >
-      <Text style={styles.number}>{num}</Text>
+      <Text style={[styles.number, isDarkMode && styles.darkText]}>{num}</Text>
     </TouchableOpacity>
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <Text style={styles.title}>
+    <View style={[
+      styles.container,
+      isDarkMode && styles.darkContainer,
+      { paddingTop: insets.top }
+    ]}>
+      <Text style={[styles.title, isDarkMode && styles.darkText]}>
         {step === 'create' ? 'Create PIN' : 'Confirm PIN'}
       </Text>
-      <Text style={styles.subtitle}>
+      <Text style={[styles.subtitle, isDarkMode && styles.darkSecondaryText]}>
         {step === 'create'
           ? 'Enter a 4-digit PIN'
           : 'Re-enter your PIN to confirm'}
@@ -107,7 +130,7 @@ export function SetupPINScreen({ onComplete }: Props) {
                 backgroundColor:
                   (step === 'create' ? pin.length : confirmPin.length) > i
                     ? '#22c55e'
-                    : '#e2e8f0',
+                    : isDarkMode ? '#333' : '#e2e8f0',
               },
             ]}
           />
@@ -123,7 +146,7 @@ export function SetupPINScreen({ onComplete }: Props) {
           onPress={handleDelete}
           activeOpacity={0.7}
         >
-          <Text style={styles.deleteButton}>⌫</Text>
+          <Text style={[styles.deleteButton, isDarkMode && styles.darkSecondaryText]}>⌫</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -138,6 +161,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: 16,
   },
+  darkContainer: {
+    backgroundColor: '#1a1a1a',
+  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
@@ -145,10 +171,16 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 24,
   },
+  darkText: {
+    color: '#fff',
+  },
   subtitle: {
     fontSize: 16,
     color: '#666',
     marginBottom: 24,
+  },
+  darkSecondaryText: {
+    color: '#999',
   },
   dotsContainer: {
     flexDirection: 'row',

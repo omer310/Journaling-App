@@ -16,6 +16,7 @@ export default function LoginPage() {
     e.preventDefault();
     try {
       await signIn(email, password);
+      router.push('/journal');
     } catch (error) {
       setError('Invalid email or password');
       console.error('Login error:', error);
@@ -80,12 +81,9 @@ export default function LoginPage() {
           </div>
         </form>
         <div className="text-center">
-          <p className="text-sm text-secondary-600 dark:text-secondary-400">
-            Don't have an account?{' '}
-            <Link
-              href="/register"
-              className="font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
-            >
+          <p className="text-center text-gray-600 dark:text-gray-400">
+            Don&apos;t have an account?{' '}
+            <Link href="/register" className="text-primary-600 hover:underline">
               Sign up
             </Link>
           </p>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthProvider';
 import { getEntry, updateEntry } from '@/lib/journal';
 import { useRouter } from 'next/navigation';
@@ -18,13 +18,7 @@ export function EditJournalForm({ id }: EditJournalFormProps) {
   const { user } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (user && id) {
-      loadEntry();
-    }
-  }, [user, id]);
-
-  const loadEntry = async () => {
+  const loadEntry = useCallback(async () => {
     try {
       const entry = await getEntry(id);
       if (!entry) {
@@ -43,7 +37,13 @@ export function EditJournalForm({ id }: EditJournalFormProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, user, router]);
+
+  useEffect(() => {
+    if (user && id) {
+      loadEntry();
+    }
+  }, [user, id, loadEntry]);
 
   const handleSave = async () => {
     if (!user) {

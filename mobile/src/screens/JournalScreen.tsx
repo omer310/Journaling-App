@@ -23,6 +23,9 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
   const [title, setTitle] = useState(entry?.title || '');
   const [content, setContent] = useState(entry?.content || '');
   const [isSaving, setIsSaving] = useState(false);
+  const [isBold, setIsBold] = useState(false);
+  const [isItalic, setIsItalic] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -31,6 +34,14 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
       setContent(entry.content);
     }
   }, [entry]);
+
+  useEffect(() => {
+    const loadTheme = async () => {
+      const theme = await storage.getTheme();
+      setIsDarkMode(theme === 'dark');
+    };
+    loadTheme();
+  }, []);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -54,18 +65,13 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
         synced: false,
       };
 
-      console.log('Saving entry:', newEntry);
-      
       if (entry) {
         await storage.updateEntry(newEntry);
       } else {
         await storage.createEntry(newEntry);
       }
 
-      // Verify the entry was saved
       const savedEntry = await storage.getEntry(newEntry.id);
-      console.log('Saved entry:', savedEntry);
-
       if (savedEntry) {
         onSave();
       } else {
@@ -81,20 +87,28 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
+      style={[
+        styles.container, 
+        { paddingTop: insets.top },
+        isDarkMode && styles.darkContainer
+      ]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, isDarkMode && styles.darkHeader]}>
         <TouchableOpacity
           onPress={onCancel}
-          disabled={isSaving}
+          disabled={isSaving} 
           style={styles.headerButton}
         >
-          <Text style={[styles.headerButtonText, isSaving && styles.disabledText]}>
+          <Text style={[
+            styles.headerButtonText, 
+            isSaving && styles.disabledText,
+            isDarkMode && styles.darkText
+          ]}>
             Cancel
           </Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
+        <Text style={[styles.headerTitle, isDarkMode && styles.darkText]}>
           {entry ? 'Edit Entry' : 'New Entry'}
         </Text>
         <TouchableOpacity
@@ -114,19 +128,41 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
         </TouchableOpacity>
       </View>
 
+      <TextInput
+        style={[styles.titleInput, isDarkMode && styles.darkInput]}
+        placeholder="Entry Title"
+        placeholderTextColor={isDarkMode ? '#666' : '#999'}
+        value={title}
+        onChangeText={setTitle}
+        maxLength={100}
+        returnKeyType="next"
+      />
+
+      <View style={[styles.toolbar, isDarkMode && styles.darkToolbar]}>
+        <TouchableOpacity
+          style={[styles.toolbarButton, isBold && styles.toolbarButtonActive]}
+          onPress={() => setIsBold(!isBold)}
+        >
+          <Text style={[styles.toolbarButtonText, isBold && styles.toolbarButtonTextActive]}>B</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toolbarButton, isItalic && styles.toolbarButtonActive]}
+          onPress={() => setIsItalic(!isItalic)}
+        >
+          <Text style={[styles.toolbarButtonText, isItalic && styles.toolbarButtonTextActive]}>I</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView style={styles.content}>
         <TextInput
-          style={styles.titleInput}
-          placeholder="Entry Title"
-          value={title}
-          onChangeText={setTitle}
-          maxLength={100}
-          returnKeyType="next"
-        />
-
-        <TextInput
-          style={styles.contentInput}
+          style={[
+            styles.contentInput,
+            isDarkMode && styles.darkInput,
+            isBold && styles.boldText,
+            isItalic && styles.italicText,
+          ]}
           placeholder="Write your thoughts..."
+          placeholderTextColor={isDarkMode ? '#666' : '#999'}
           value={content}
           onChangeText={setContent}
           multiline
@@ -141,7 +177,7 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fff', // Light mode background
   },
   header: {
     flexDirection: 'row',
@@ -175,15 +211,41 @@ const styles = StyleSheet.create({
   disabledText: {
     opacity: 0.5,
   },
-  content: {
-    flex: 1,
-  },
   titleInput: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: '#1a1a1a', // Light mode text
     padding: 16,
     paddingBottom: 8,
+  },
+  toolbarButtonText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  toolbar: {
+    flexDirection: 'row',
+    padding: 8,
+    backgroundColor: '#f8fafc',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  toolbarButton: {
+    padding: 8,
+    marginHorizontal: 4,
+    borderRadius: 4,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  toolbarButtonActive: {
+    backgroundColor: '#4f46e5',
+    borderColor: '#4f46e5',
+  },
+  toolbarButtonTextActive: {
+    color: '#fff',
+  },
+  content: {
+    flex: 1,
   },
   contentInput: {
     flex: 1,
@@ -193,4 +255,27 @@ const styles = StyleSheet.create({
     padding: 16,
     minHeight: 200,
   },
-}); 
+  boldText: {
+    fontWeight: 'bold',
+  },
+  italicText: {
+    fontStyle: 'italic',
+  },
+  darkContainer: {
+    backgroundColor: '#1a1a1a',
+  },
+  darkHeader: {
+    borderBottomColor: '#2d2d2d',
+  },
+  darkText: {
+    color: '#fff',
+  },
+  darkInput: {
+    color: '#fff',
+    backgroundColor: '#1a1a1a',
+  },
+  darkToolbar: {
+    backgroundColor: '#2d2d2d',
+    borderBottomColor: '#404040',
+  },
+});

@@ -1,50 +1,69 @@
-import { Stack } from 'expo-router';
+import { Stack, SplashScreen } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StyleSheet } from 'react-native';
-import { useEffect } from 'react';
-import { auth } from '../src/services/auth';
-import { sync } from '../src/services/sync';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { StyleSheet, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useEffect, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
 
-export default function Layout() {
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync();
+
+export default function RootLayout() {
+  const [initialRoute, setInitialRoute] = useState<string | null>(null);
+
   useEffect(() => {
-    const signInWithStoredCredentials = async () => {
+    async function prepare() {
       try {
-        // First try to restore Firebase auth state
-        const authUser = await sync.restoreAuthState();
-        if (authUser) {
-          // Get stored web credentials
-          const credentials = await auth.getWebCredentials();
-          if (credentials) {
-            // Re-authenticate with Firebase
-            await signInWithEmailAndPassword(
-              getAuth(),
-              credentials.email,
-              credentials.password
-            );
-          }
+        // Check for existing PIN
+        const pin = await SecureStore.getItemAsync('journal_pin');
+        
+        // If we have a PIN, go to unlock screen, otherwise go to setup
+        if (pin) {
+          console.log('Existing PIN found, routing to unlock screen');
+          setInitialRoute('unlock');
+        } else {
+          console.log('No PIN found, routing to setup screen');
+          setInitialRoute('setup');
         }
       } catch (error) {
-        console.error('Error signing in with stored credentials:', error);
+        console.error('Error during initialization:', error);
+        // Default to setup if there's an error
+        setInitialRoute('setup');
+      } finally {
+        // Hide the splash screen once we're done
+        await SplashScreen.hideAsync();
       }
-    };
+    }
 
-    signInWithStoredCredentials();
+    prepare();
   }, []);
 
+  // While the app is loading, show nothing
+  if (!initialRoute) {
+    return null;
+  }
+
   return (
-    <GestureHandlerRootView style={styles.container}>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      />
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={styles.container}>
+        <View style={styles.container}>
+          <Stack
+            initialRouteName={initialRoute}
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: 'transparent' },
+              animation: 'fade',
+            }}
+          />
+        </View>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#1a1a1a',
   },
 });

@@ -7,7 +7,7 @@ import { NavLink } from '@/components/NavLink';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Personal Journal',
+  title: 'Soul Pages',
   description: 'A secure and private journaling application',
 };
 

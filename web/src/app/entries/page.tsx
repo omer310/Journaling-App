@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { getUserEntries, deleteEntry } from '@/lib/journal';
 import { JournalEntry } from '@/types/journal';
@@ -13,13 +13,7 @@ export default function EntriesPage() {
   const { user } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (user) {
-      loadEntries();
-    }
-  }, [user]);
-
-  const loadEntries = async () => {
+  const loadEntries = useCallback(async () => {
     try {
       const userEntries = await getUserEntries(user!.uid);
       setEntries(userEntries);
@@ -29,7 +23,13 @@ export default function EntriesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      loadEntries();
+    }
+  }, [user, loadEntries]);
 
   const handleDelete = async (entryId: string) => {
     if (!confirm('Are you sure you want to delete this entry?')) {
@@ -82,6 +82,11 @@ export default function EntriesPage() {
                     <div>
                       <h2 className="text-xl font-semibold text-primary-900 dark:text-primary-100 mb-2">
                         {entry.title}
+                        {entry.source === 'mobile' && (
+                          <span className="ml-2 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 rounded-full">
+                            Mobile
+                          </span>
+                        )}
                       </h2>
                       <p className="text-sm text-secondary-500 dark:text-secondary-400 mb-4">
                         {new Date(entry.createdAt).toLocaleDateString()} at{' '}

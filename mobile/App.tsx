@@ -12,6 +12,7 @@ type Screen = 'setup' | 'unlock' | 'entries' | 'journal' | 'settings';
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('unlock');
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | undefined>();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     checkPINSetup();
@@ -19,16 +20,18 @@ export default function App() {
 
   const checkPINSetup = async () => {
     try {
-      const credentials = await auth.verifyPIN('');
-      setCurrentScreen(credentials ? 'unlock' : 'setup');
+      const existingPIN = await auth.getPIN();
+      setCurrentScreen(existingPIN ? 'unlock' : 'setup');
     } catch (error) {
       console.error('Error checking PIN setup:', error);
       setCurrentScreen('setup');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSetupComplete = () => {
-    setCurrentScreen('entries');
+    setCurrentScreen('unlock'); // After setup, go to unlock screen
   };
 
   const handleUnlock = () => {
@@ -53,15 +56,21 @@ export default function App() {
     setCurrentScreen('entries');
   };
 
+  if (isLoading) {
+    return null; // Or a loading spinner
+  }
+
   return (
     <SafeAreaProvider>
       {currentScreen === 'setup' && (
         <SetupPINScreen onComplete={handleSetupComplete} />
       )}
-      {currentScreen === 'unlock' && <UnlockScreen onUnlock={handleUnlock} />}
+      {currentScreen === 'unlock' && (
+        <UnlockScreen onUnlock={handleUnlock} />
+      )}
       {currentScreen === 'entries' && (
-        <EntriesScreen 
-          onNewEntry={handleNewEntry} 
+        <EntriesScreen
+          onNewEntry={handleNewEntry}
           onEditEntry={handleEditEntry}
           onOpenSettings={() => setCurrentScreen('settings')}
         />
