@@ -10,43 +10,69 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#f0fdf4',
-          100: '#dcfce7',
-          200: '#bbf7d0',
-          300: '#86efac',
-          400: '#4ade80',
-          500: '#22c55e',
-          600: '#16a34a',
-          700: '#15803d',
-          800: '#166534',
-          900: '#14532d',
-        },
-        secondary: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-        },
-        dark: {
-          bg: '#1a1a1a',
-          card: '#2d2d2d',
-          border: '#404040',
+        primary: 'var(--primary)',
+        'primary-light': 'var(--primary-light)',
+        'primary-dark': 'var(--primary-dark)',
+        secondary: 'var(--secondary)',
+        background: 'var(--background)',
+        surface: 'var(--surface)',
+        'surface-hover': 'var(--surface-hover)',
+        border: 'var(--border)',
+        text: {
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          muted: 'var(--text-muted)',
         },
       },
-      fontFamily: {
-        sans: ['var(--font-inter)'],
-        serif: ['var(--font-lora)'],
-      },
+      typography: (theme: any) => ({
+        DEFAULT: {
+          css: {
+            color: 'var(--text-primary)',
+            a: {
+              color: 'var(--primary)',
+              '&:hover': {
+                color: 'var(--primary-dark)',
+              },
+            },
+            h1: {
+              color: 'var(--text-primary)',
+            },
+            h2: {
+              color: 'var(--text-primary)',
+            },
+            h3: {
+              color: 'var(--text-primary)',
+            },
+            h4: {
+              color: 'var(--text-primary)',
+            },
+            strong: {
+              color: 'var(--text-primary)',
+            },
+            blockquote: {
+              color: 'var(--text-secondary)',
+              borderLeftColor: 'var(--border)',
+            },
+            code: {
+              color: 'var(--text-primary)',
+              backgroundColor: 'var(--surface-hover)',
+            },
+            'code::before': {
+              content: '""',
+            },
+            'code::after': {
+              content: '""',
+            },
+            pre: {
+              backgroundColor: 'var(--surface)',
+              color: 'var(--text-primary)',
+            },
+          },
+        },
+      }),
     },
   },
-  plugins: [],
+  plugins: [require('@tailwindcss/typography')],
 } satisfies Config;
 
 export default config

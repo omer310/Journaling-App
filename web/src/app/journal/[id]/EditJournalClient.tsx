@@ -1,63 +1,51 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { Tags } from '@/components/Tags';
 import { useStore } from '@/store/useStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
-export default function JournalPage() {
+interface EditJournalClientProps {
+  params: {
+    id: string;
+  };
+}
+
+export function EditJournalClient({ params }: EditJournalClientProps) {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const { tags, entries, addEntry, addTag } = useStore();
+  const { tags, entries, updateEntry, addTag } = useStore();
 
   useEffect(() => {
-    // Load draft from localStorage if exists
-    const draft = localStorage.getItem('journal-draft');
-    if (draft) {
-      const { title: draftTitle, content: draftContent, tags: draftTags } = JSON.parse(draft);
-      setTitle(draftTitle || '');
-      setContent(draftContent || '');
-      setSelectedTags(draftTags || []);
+    const entry = entries.find((e) => e.id === params.id);
+    if (entry) {
+      setTitle(entry.title);
+      setContent(entry.content);
+      setSelectedTags(entry.tags);
+      setLoading(false);
+    } else {
+      router.push('/entries');
     }
-  }, []);
-
-  // Autosave draft
-  useEffect(() => {
-    const draft = {
-      title,
-      content,
-      tags: selectedTags,
-    };
-    localStorage.setItem('journal-draft', JSON.stringify(draft));
-  }, [title, content, selectedTags]);
+  }, [entries, params.id, router]);
 
   const handleSave = async () => {
     if (!title.trim() || !content.trim()) return;
 
     setSaving(true);
     try {
-      addEntry({
+      updateEntry(params.id, {
         title: title.trim(),
         content: content.trim(),
-        date: new Date().toISOString(),
         tags: selectedTags,
       });
 
-      // Clear draft
-      localStorage.removeItem('journal-draft');
-      
-      // Reset form
-      setTitle('');
-      setContent('');
-      setSelectedTags([]);
-      
-      // Navigate to entries page
       router.push('/entries');
     } catch (error) {
       console.error('Failed to save entry:', error);
@@ -74,6 +62,14 @@ export default function JournalPage() {
     };
     addTag(newTag);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-2xl text-primary">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <ProtectedRoute>
@@ -114,23 +110,18 @@ export default function JournalPage() {
 
             <div className="mt-6 flex justify-end space-x-4">
               <button
-                onClick={() => {
-                  setTitle('');
-                  setContent('');
-                  setSelectedTags([]);
-                  localStorage.removeItem('journal-draft');
-                }}
+                onClick={() => router.push('/entries')}
                 className="px-6 py-2 bg-surface-hover text-secondary rounded-lg hover:bg-border transition-colors duration-200"
                 disabled={saving}
               >
-                Clear
+                Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving || !title.trim() || !content.trim()}
                 className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? 'Saving...' : 'Save Entry'}
+                {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>

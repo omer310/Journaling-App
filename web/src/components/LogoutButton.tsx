@@ -1,16 +1,30 @@
 'use client';
 
-import { useAuth } from './AuthProvider';
+import { useRouter } from 'next/navigation';
+import { signOut } from 'firebase/auth';
+import { auth } from './AuthProvider';
+import { RiLogoutBoxLine } from 'react-icons/ri';
 
 export default function LogoutButton() {
-  const { logOut } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      alert('Failed to log out. Please try again.');
+    }
+  };
 
   return (
     <button
-      onClick={logOut}
-      className="px-4 py-2 text-sm font-medium text-secondary-700 dark:text-secondary-300 hover:text-secondary-900 dark:hover:text-secondary-100"
+      onClick={handleLogout}
+      className="p-2 rounded-lg bg-surface text-secondary hover:text-primary"
+      title="Sign out"
     >
-      Sign Out
+      <RiLogoutBoxLine className="w-5 h-5" />
     </button>
   );
 } 

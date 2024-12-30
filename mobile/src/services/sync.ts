@@ -10,22 +10,21 @@ import {
   Timestamp,
   initializeFirestore
 } from 'firebase/firestore';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, signInWithEmailAndPassword, initializeAuth, indexedDBLocalPersistence } from 'firebase/auth';
 import { storage, JournalEntry } from './storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBqq3qKvQtF_Ck5zTxuHZPNZPxDkL_Qqxc",
-  authDomain: "journaling-app-c8a6e.firebaseapp.com",
-  projectId: "journaling-app-c8a6e",
-  storageBucket: "journaling-app-c8a6e.appspot.com",
-  messagingSenderId: "1098127367604",
-  appId: "1:1098127367604:web:c5c6c5e4d4f2c0b4b4b4b4"
-};
+import { firebaseConfig } from '../config/firebase';
 
 // Initialize Firebase only if it hasn't been initialized
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
+
+// Initialize Auth with proper persistence
+const auth = getApps().length === 0 
+  ? initializeAuth(app, {
+      persistence: indexedDBLocalPersistence
+    })
+  : getAuth(app);
+
 const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
 });
@@ -53,12 +52,14 @@ export const sync = {
       }
 
       const userId = auth.currentUser.uid;
-      const entryRef = doc(db, 'users', userId, 'entries', entry.id);
+      const entryRef = doc(db, 'journal_entries', entry.id);
       
       await setDoc(entryRef, {
         ...entry,
+        userId,
         updatedAt: Timestamp.fromDate(new Date(entry.updatedAt)),
         createdAt: Timestamp.fromDate(new Date(entry.createdAt)),
+        source: 'mobile',
       });
 
       // Mark entry as synced
@@ -87,8 +88,12 @@ export const sync = {
       }
 
       // Download remote entries
-      const entriesRef = collection(db, 'users', userId, 'entries');
-      const q = query(entriesRef, where('updatedAt', '>', Timestamp.fromDate(new Date(0))));
+      const entriesRef = collection(db, 'journal_entries');
+      const q = query(
+        entriesRef,
+        where('userId', '==', userId),
+        where('updatedAt', '>', Timestamp.fromDate(new Date(0)))
+      );
       const querySnapshot = await getDocs(q);
 
       const remoteEntries: JournalEntry[] = [];

@@ -7,4 +7,5 @@ export interface JournalEntry {
   userId: string;
   tags?: string[];
   mood?: 'happy' | 'sad' | 'neutral' | 'excited' | 'anxious' | 'calm';
+  source?: 'mobile' | 'web';
 } 

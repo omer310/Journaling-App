@@ -18,13 +18,14 @@ const COLLECTION_NAME = 'journal_entries';
 
 export async function createEntry(
   userId: string,
-  entry: Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt' | 'userId'>
+  entry: Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt' | 'userId' | 'source'>
 ): Promise<string> {
   const docRef = await addDoc(collection(db, COLLECTION_NAME), {
     ...entry,
     userId,
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
+    source: 'web',
   });
   return docRef.id;
 }

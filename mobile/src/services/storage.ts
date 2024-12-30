@@ -1,6 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ENTRIES_KEY = 'journal_entries';
+const THEME_KEY = 'app_theme';
+
+export type Theme = 'light' | 'dark';
 
 export interface JournalEntry {
   id: string;
@@ -82,6 +85,24 @@ export const storage = {
     } catch (error) {
       console.error('Error saving entry:', error);
       return false;
+    }
+  },
+
+  async getTheme(): Promise<Theme> {
+    try {
+      const theme = await AsyncStorage.getItem(THEME_KEY);
+      return (theme as Theme) || 'dark';
+    } catch (error) {
+      console.error('Error getting theme:', error);
+      return 'dark';
+    }
+  },
+
+  async setTheme(theme: Theme): Promise<void> {
+    try {
+      await AsyncStorage.setItem(THEME_KEY, theme);
+    } catch (error) {
+      console.error('Error setting theme:', error);
     }
   },
 }; 

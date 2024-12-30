@@ -26,6 +26,7 @@ export function EntriesScreen({ onEditEntry, onNewEntry, onOpenSettings }: Props
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const insets = useSafeAreaInsets();
 
   const loadEntries = useCallback(async () => {
@@ -44,7 +45,13 @@ export function EntriesScreen({ onEditEntry, onNewEntry, onOpenSettings }: Props
 
   useEffect(() => {
     loadEntries();
-  }, [loadEntries]);
+    loadTheme();
+  }, []);
+
+  const loadTheme = async () => {
+    const theme = await storage.getTheme();
+    setIsDarkMode(theme === 'dark');
+  };
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
@@ -153,42 +160,6 @@ export function EntriesScreen({ onEditEntry, onNewEntry, onOpenSettings }: Props
     );
   };
 
-  const renderItem = ({ item }: { item: JournalEntry }) => (
-    <Swipeable
-      renderRightActions={(progress, dragX) =>
-        renderRightActions(progress, dragX, item.id)
-      }
-      renderLeftActions={(progress, dragX) =>
-        renderLeftActions(progress, dragX, item)
-      }
-      rightThreshold={40}
-      leftThreshold={40}
-    >
-      <TouchableOpacity
-        style={styles.entryCard}
-        onPress={() => onEditEntry(item)}
-      >
-        <Text style={styles.entryTitle} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.entryDate}>
-          {new Date(item.createdAt).toLocaleDateString()}
-        </Text>
-        <Text style={styles.entryPreview} numberOfLines={2}>
-          {item.content}
-        </Text>
-        {!item.synced && (
-          <View style={styles.syncBadge}>
-            <Text style={styles.syncBadgeText}>Not Synced</Text>
-          </View>
-        )}
-        <Text style={styles.actionHint}>
-          ← Swipe to sync • Swipe to delete →
-        </Text>
-      </TouchableOpacity>
-    </Swipeable>
-  );
-
   if (isLoading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -198,9 +169,15 @@ export function EntriesScreen({ onEditEntry, onNewEntry, onOpenSettings }: Props
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Journal Entries</Text>
+    <View style={[
+      styles.container,
+      isDarkMode && styles.darkContainer,
+    ]}>
+      <View style={[
+        styles.header,
+        { paddingTop: insets.top + 8 },
+        isDarkMode && styles.darkHeader
+      ]}>
         <View style={styles.headerButtons}>
           <TouchableOpacity 
             onPress={handleSyncAll} 
@@ -210,11 +187,14 @@ export function EntriesScreen({ onEditEntry, onNewEntry, onOpenSettings }: Props
             {isSyncing ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Text style={styles.syncAllButtonText}>↑ Sync All</Text>
+              <Text style={styles.syncAllButtonText}>↑ Sync</Text>
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={onOpenSettings} style={styles.settingsButton}>
-            <Text style={styles.settingsButtonText}>⚙️</Text>
+          <TouchableOpacity 
+            onPress={onOpenSettings} 
+            style={[styles.settingsButton, isDarkMode && styles.darkSettingsButton]}
+          >
+            <Text style={[styles.settingsButtonText, isDarkMode && styles.darkSettingsButtonText]}>⚙</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={onNewEntry} style={styles.newButton}>
             <Text style={styles.newButtonText}>New Entry</Text>
@@ -224,15 +204,47 @@ export function EntriesScreen({ onEditEntry, onNewEntry, onOpenSettings }: Props
 
       {entries.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyStateText}>No entries yet</Text>
-          <Text style={styles.emptyStateSubtext}>
+          <Text style={[styles.emptyStateText, isDarkMode && styles.darkText]}>No entries yet</Text>
+          <Text style={[styles.emptyStateSubtext, isDarkMode && styles.darkSecondaryText]}>
             Tap the New Entry button to start writing
           </Text>
         </View>
       ) : (
         <FlatList
           data={entries}
-          renderItem={renderItem}
+          renderItem={({ item }) => (
+            <Swipeable
+              renderRightActions={(progress, dragX) =>
+                renderRightActions(progress, dragX, item.id)
+              }
+              renderLeftActions={(progress, dragX) =>
+                renderLeftActions(progress, dragX, item)
+              }
+              rightThreshold={40}
+              leftThreshold={40}
+              containerStyle={styles.swipeableContainer}
+            >
+              <TouchableOpacity
+                style={[styles.entryCard, isDarkMode && styles.darkEntryCard]}
+                onPress={() => onEditEntry(item)}
+              >
+                <Text style={[styles.entryTitle, isDarkMode && styles.darkText]} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                <Text style={[styles.entryDate, isDarkMode && styles.darkSecondaryText]}>
+                  {new Date(item.createdAt).toLocaleDateString()}
+                </Text>
+                <Text style={[styles.entryPreview, isDarkMode && styles.darkText]} numberOfLines={2}>
+                  {item.content}
+                </Text>
+                {!item.synced && (
+                  <View style={styles.syncBadge}>
+                    <Text style={styles.syncBadgeText}>Not Synced</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </Swipeable>
+          )}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           refreshControl={
@@ -240,7 +252,7 @@ export function EntriesScreen({ onEditEntry, onNewEntry, onOpenSettings }: Props
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
               colors={['#22c55e']}
-              tintColor="#22c55e"
+              tintColor={isDarkMode ? '#22c55e' : '#22c55e'}
             />
           }
         />
@@ -254,56 +266,83 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  darkContainer: {
+    backgroundColor: '#1a1a1a',
+  },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
+    marginBottom: 8,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  darkHeader: {
+    backgroundColor: '#1a1a1a',
+    borderBottomColor: '#2d2d2d',
+  },
+  darkText: {
+    color: '#fff',
+  },
+  darkSecondaryText: {
+    color: '#a1a1aa',
+  },
+  settingsButton: {
+    padding: 8,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  darkSettingsButton: {
+    backgroundColor: '#2d2d2d',
+  },
+  settingsButtonText: {
+    fontSize: 26,
     color: '#1a1a1a',
+  },
+  darkSettingsButtonText: {
+    color: '#fff',
+  },
+  darkEntryCard: {
+    backgroundColor: '#2d2d2d',
+    borderColor: '#404040',
   },
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    width: '100%',
+    maxWidth: 340,
+    gap: 16,
   },
   syncAllButton: {
     backgroundColor: '#4f46e5',
     borderRadius: 8,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
+    minWidth: 85,
+    justifyContent: 'center',
   },
   syncAllButtonText: {
     color: '#fff',
     fontWeight: '600',
     fontSize: 15,
   },
-  settingsButton: {
-    padding: 8,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  settingsButtonText: {
-    fontSize: 20,
-  },
   newButton: {
     backgroundColor: '#22c55e',
     borderRadius: 8,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   newButtonText: {
     color: '#fff',
@@ -317,7 +356,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
@@ -361,14 +399,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#3b82f6',
     justifyContent: 'center',
     alignItems: 'flex-start',
-    marginBottom: 16,
     borderRadius: 12,
+    height: '100%',
+    width: 100,
   },
   syncButton: {
-    padding: 16,
+    height: '100%',
+    width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 80,
   },
   syncButtonText: {
     color: '#fff',
@@ -379,11 +418,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef4444',
     justifyContent: 'center',
     alignItems: 'flex-end',
-    marginBottom: 16,
     borderRadius: 12,
+    height: '100%',
+    width: 100,
   },
   deleteButton: {
-    padding: 16,
+    height: '100%',
+    width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -414,5 +455,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+  },
+  swipeableContainer: {
+    marginBottom: 16,
   },
 }); 
