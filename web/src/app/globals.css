@@ -3,63 +3,48 @@
 @tailwind utilities;
 
 :root {
-  /* Base colors */
+  /* Light theme variables */
   --background: #ffffff;
   --foreground: #171717;
-  
-  /* Theme colors */
   --primary: #009F6B;
   --primary-light: #00B377;
   --primary-dark: #008C5E;
   --secondary: #64748b;
-  
-  /* UI colors */
   --surface: #ffffff;
   --surface-hover: #f8fafc;
   --border: #e2e8f0;
   --text-primary: #171717;
   --text-secondary: #64748b;
   --text-muted: #94a3b8;
-  
-  /* Editor colors */
   --editor-bg: #ffffff;
   --editor-text: #171717;
   --editor-border: #e2e8f0;
   --editor-toolbar: #f8fafc;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Base colors */
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    
-    /* Theme colors */
-    --primary: #00B377;
-    --primary-light: #00CC88;
-    --primary-dark: #009F6B;
-    --secondary: #94a3b8;
-    
-    /* UI colors */
-    --surface: #1a1a1a;
-    --surface-hover: #262626;
-    --border: #404040;
-    --text-primary: #ededed;
-    --text-secondary: #a3a3a3;
-    --text-muted: #737373;
-    
-    /* Editor colors */
-    --editor-bg: #1a1a1a;
-    --editor-text: #ededed;
-    --editor-border: #404040;
-    --editor-toolbar: #262626;
-  }
+.dark {
+  /* Dark theme variables */
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --primary: #00B377;
+  --primary-light: #00CC88;
+  --primary-dark: #009F6B;
+  --secondary: #94a3b8;
+  --surface: #1a1a1a;
+  --surface-hover: #262626;
+  --border: #404040;
+  --text-primary: #ededed;
+  --text-secondary: #a3a3a3;
+  --text-muted: #737373;
+  --editor-bg: #1a1a1a;
+  --editor-text: #ededed;
+  --editor-border: #404040;
+  --editor-toolbar: #262626;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
 }
 
 /* Rich text editor styles */

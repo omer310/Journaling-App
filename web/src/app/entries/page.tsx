@@ -172,17 +172,19 @@ export default function EntriesPage() {
                             <div className="flex gap-2">
                               <button
                                 onClick={() => router.push(`/journal/${entry.id}`)}
-                                className="p-2 text-secondary hover:text-primary"
+                                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20"
                                 title="Edit entry"
                               >
                                 <RiEdit2Line className="w-5 h-5" />
+                                <span>Edit</span>
                               </button>
                               <button
                                 onClick={() => handleDelete(entry.id)}
-                                className="p-2 text-secondary hover:text-red-500"
+                                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20"
                                 title="Delete entry"
                               >
                                 <RiDeleteBinLine className="w-5 h-5" />
+                                <span>Delete</span>
                               </button>
                             </div>
                           </div>

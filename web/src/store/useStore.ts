@@ -195,6 +195,32 @@ export const useStore = create<AppState>()(
         tags: state.tags,
         pendingSync: state.pendingSync,
       }),
+      storage: {
+        getItem: (name) => {
+          try {
+            const str = localStorage.getItem(name);
+            if (!str) return null;
+            return JSON.parse(str);
+          } catch (error) {
+            console.warn('Failed to get from storage:', error);
+            return null;
+          }
+        },
+        setItem: (name, value) => {
+          try {
+            localStorage.setItem(name, JSON.stringify(value));
+          } catch (error) {
+            console.warn('Failed to save to storage:', error);
+          }
+        },
+        removeItem: (name) => {
+          try {
+            localStorage.removeItem(name);
+          } catch (error) {
+            console.warn('Failed to remove from storage:', error);
+          }
+        },
+      },
     }
   )
 );
