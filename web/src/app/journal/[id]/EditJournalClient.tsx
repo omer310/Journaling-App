@@ -6,12 +6,16 @@ import { RichTextEditor } from '@/components/RichTextEditor';
 import { Tags } from '@/components/Tags';
 import { useStore } from '@/store/useStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { auth } from '@/components/AuthProvider';
+import { onSnapshot, doc, getFirestore } from 'firebase/firestore';
 
 interface EditJournalClientProps {
   params: {
     id: string;
   };
 }
+
+const db = getFirestore();
 
 export function EditJournalClient({ params }: EditJournalClientProps) {
   const router = useRouter();
@@ -20,27 +24,72 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
 
   const { tags, entries, updateEntry, addTag } = useStore();
 
   useEffect(() => {
+    // Check if user is authenticated
+    if (!auth.currentUser) {
+      router.push('/login');
+      return;
+    }
+
+    console.log('Current entries:', entries);
+    console.log('Looking for entry with ID:', params.id);
+
+    // First try to find the entry in the store
     const entry = entries.find((e) => e.id === params.id);
     if (entry) {
+      console.log('Found entry in store:', entry);
       setTitle(entry.title);
       setContent(entry.content);
-      setSelectedTags(entry.tags);
+      setSelectedTags(entry.tags || []);
       setLoading(false);
-    } else {
-      router.push('/entries');
+      return;
     }
-  }, [entries, params.id, router]);
+
+    // If not found in store, try to fetch directly from Firestore
+    const unsubscribe = onSnapshot(
+      doc(db, 'journal_entries', params.id),
+      (doc) => {
+        if (doc.exists()) {
+          console.log('Found entry in Firestore:', doc.data());
+          const data = doc.data();
+          setTitle(data.title || '');
+          setContent(data.content || '');
+          setSelectedTags(data.tags || []);
+          setLoading(false);
+        } else {
+          console.log('Entry not found in Firestore');
+          if (retryCount < 3) {
+            // Retry a few times before showing error
+            setTimeout(() => {
+              setRetryCount(prev => prev + 1);
+            }, 1000);
+          } else {
+            setError('Entry not found. Please try again.');
+            setLoading(false);
+          }
+        }
+      },
+      (error) => {
+        console.error('Error fetching entry:', error);
+        setError('Failed to load entry. Please try again.');
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [entries, params.id, router, retryCount]);
 
   const handleSave = async () => {
     if (!title.trim() || !content.trim()) return;
 
     setSaving(true);
     try {
-      updateEntry(params.id, {
+      await updateEntry(params.id, {
         title: title.trim(),
         content: content.trim(),
         tags: selectedTags,
@@ -49,7 +98,7 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
       router.push('/entries');
     } catch (error) {
       console.error('Failed to save entry:', error);
-      alert('Failed to save entry. Please try again.');
+      setError('Failed to save entry. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -67,6 +116,20 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-2xl text-primary">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <div className="text-2xl text-red-500">{error}</div>
+        <button
+          onClick={() => router.push('/entries')}
+          className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
+        >
+          Back to Entries
+        </button>
       </div>
     );
   }
