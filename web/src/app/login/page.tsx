@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
 import { auth } from '@/components/AuthProvider';
 import Link from 'next/link';
 
@@ -26,9 +27,13 @@ export default function LoginPage() {
       setError('');
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/journal');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error);
-      setError(error.message || 'Failed to log in. Please try again.');
+      if (error instanceof FirebaseError) {
+        setError(error.message || 'Failed to log in. Please try again.');
+      } else {
+        setError('Failed to log in. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

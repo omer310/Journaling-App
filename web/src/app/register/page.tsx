@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
 import { auth } from '@/components/AuthProvider';
 import Link from 'next/link';
 
@@ -37,9 +38,13 @@ export default function RegisterPage() {
       setError('');
       await createUserWithEmailAndPassword(auth, email, password);
       router.push('/journal');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Registration error:', error);
-      setError(error.message || 'Failed to register. Please try again.');
+      if (error instanceof FirebaseError) {
+        setError(error.message || 'Failed to register. Please try again.');
+      } else {
+        setError('Failed to register. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
