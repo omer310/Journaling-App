@@ -2,42 +2,55 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/components/AuthProvider';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '@/components/AuthProvider';
 import Link from 'next/link';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { signIn } = useAuth();
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
+
     try {
-      await signIn(email, password);
+      setLoading(true);
+      setError('');
+      await signInWithEmailAndPassword(auth, email, password);
       router.push('/journal');
-    } catch (error) {
-      setError('Invalid email or password');
+    } catch (error: any) {
       console.error('Login error:', error);
+      setError(error.message || 'Failed to log in. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-primary-50 dark:bg-dark-bg flex items-center justify-center px-4">
-      <div className="max-w-md w-full space-y-8 bg-white dark:bg-dark-card p-8 rounded-xl shadow-lg">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="max-w-md w-full space-y-8 bg-surface rounded-xl shadow-lg p-8">
         <div className="text-center">
-          <h2 className="mt-6 text-3xl font-bold text-primary-800 dark:text-primary-400">
-            Welcome to Your Journal
+          <h2 className="mt-6 text-3xl font-bold text-primary">
+            Welcome Back
           </h2>
-          <p className="mt-2 text-sm text-secondary-600 dark:text-secondary-400">
-            Your thoughts, securely stored
+          <p className="mt-2 text-sm text-secondary">
+            Sign in to continue your journaling journey
           </p>
         </div>
+
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
           {error && (
             <div className="text-red-500 text-sm text-center">{error}</div>
           )}
+
           <div className="rounded-md shadow-sm space-y-4">
             <div>
               <label htmlFor="email" className="sr-only">
@@ -48,12 +61,13 @@ export default function LoginPage() {
                 name="email"
                 type="email"
                 required
-                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-secondary-300 dark:border-dark-border bg-white dark:bg-dark-bg placeholder-secondary-500 dark:placeholder-secondary-400 text-secondary-900 dark:text-white focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-border bg-surface placeholder-text-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
+
             <div>
               <label htmlFor="password" className="sr-only">
                 Password
@@ -63,7 +77,7 @@ export default function LoginPage() {
                 name="password"
                 type="password"
                 required
-                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-secondary-300 dark:border-dark-border bg-white dark:bg-dark-bg placeholder-secondary-500 dark:placeholder-secondary-400 text-secondary-900 dark:text-white focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-border bg-surface placeholder-text-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -74,16 +88,21 @@ export default function LoginPage() {
           <div>
             <button
               type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 dark:bg-primary-700 dark:hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
+              disabled={loading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Sign in
+              {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </div>
         </form>
+
         <div className="text-center">
-          <p className="text-center text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-secondary">
             Don&apos;t have an account?{' '}
-            <Link href="/register" className="text-primary-600 hover:underline">
+            <Link
+              href="/register"
+              className="font-medium text-primary hover:text-primary-dark"
+            >
               Sign up
             </Link>
           </p>
