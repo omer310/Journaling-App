@@ -12,6 +12,7 @@ const nextConfig = {
   },
   basePath: process.env.NODE_ENV === 'production' ? '/Journaling-app' : '',
   assetPrefix: process.env.NODE_ENV === 'production' ? '/Journaling-app/' : '',
+  trailingSlash: true,
 }
 
 module.exports = nextConfig 
