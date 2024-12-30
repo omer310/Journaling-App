@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "deploy": "next build && type nul > out/.nojekyll && gh-pages -d out -t true"
+    "lint": "next lint"
   },
   "dependencies": {
     "@firebase/auth": "^1.8.1",
@@ -37,6 +36,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@netlify/plugin-nextjs": "^5.9.2",
     "@tailwindcss/typography": "^0.5.15",
     "@types/lodash": "^4.14.202",
     "@types/node": "^20",
