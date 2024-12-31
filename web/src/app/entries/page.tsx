@@ -4,23 +4,33 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar } from '@/components/Calendar';
 import { Search } from '@/components/Search';
-import { Tags } from '@/components/Tags';
+import { FilterPanel } from '@/components/FilterPanel';
+import { Analytics } from '@/components/Analytics';
+import { ExportMenu } from '@/components/ExportMenu';
+import { LayoutSelector, type LayoutMode } from '@/components/LayoutSelector';
+import { ListLayout, GridLayout, CompactLayout } from '@/components/EntryLayouts';
 import { useStore } from '@/store/useStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import {
   RiCalendarLine,
-  RiListUnordered,
-  RiEdit2Line,
-  RiDeleteBinLine,
+  RiBarChartLine,
+  RiCheckboxBlankLine,
+  RiCheckboxFill,
 } from 'react-icons/ri';
+import { exportToPdf, exportToMarkdown, exportToText } from '@/services/export';
 
-type ViewMode = 'list' | 'calendar';
+type ViewMode = 'list' | 'calendar' | 'analytics';
+type Mood = 'happy' | 'neutral' | 'sad';
 
 export default function EntriesPage() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('list');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const { entries, tags, removeEntry, searchEntries } = useStore();
+  const [selectedMoods, setSelectedMoods] = useState<Mood[]>([]);
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [selectedEntries, setSelectedEntries] = useState<string[]>([]);
+  const { entries, tags, removeEntry, removeTag, searchEntries } = useStore();
 
   const handleSearch = async (query: string) => {
     const results = searchEntries(query);
@@ -34,15 +44,99 @@ export default function EntriesPage() {
     router.push(`/journal/${result.id}`);
   };
 
-  const filteredEntries = entries.filter((entry) =>
-    selectedTags.length === 0
-      ? true
-      : selectedTags.every((tagId) => entry.tags.includes(tagId))
-  );
+  const filteredEntries = entries.filter((entry) => {
+    // Filter by tags
+    if (selectedTags.length > 0 && !selectedTags.every((tagId) => entry.tags.includes(tagId))) {
+      return false;
+    }
+
+    // Filter by moods
+    if (selectedMoods.length > 0 && (!entry.mood || !selectedMoods.includes(entry.mood))) {
+      return false;
+    }
+
+    // Filter by date range
+    if (dateRange.start || dateRange.end) {
+      const entryDate = new Date(entry.date);
+      if (dateRange.start) {
+        const startDate = new Date(dateRange.start);
+        startDate.setHours(0, 0, 0, 0);
+        if (entryDate < startDate) return false;
+      }
+      if (dateRange.end) {
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        if (entryDate > endDate) return false;
+      }
+    }
+
+    return true;
+  });
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this entry?')) {
       removeEntry(id);
+      setSelectedEntries(selectedEntries.filter((entryId) => entryId !== id));
+    }
+  };
+
+  const handleExport = async (format: 'pdf' | 'markdown' | 'text') => {
+    const entriesToExport = selectedEntries.length > 0
+      ? filteredEntries.filter((entry) => selectedEntries.includes(entry.id))
+      : filteredEntries;
+
+    switch (format) {
+      case 'pdf':
+        await exportToPdf(entriesToExport, tags);
+        break;
+      case 'markdown':
+        exportToMarkdown(entriesToExport, tags);
+        break;
+      case 'text':
+        exportToText(entriesToExport, tags);
+        break;
+    }
+  };
+
+  const toggleEntrySelection = (id: string) => {
+    setSelectedEntries((prev) =>
+      prev.includes(id) ? prev.filter((entryId) => entryId !== id) : [...prev, id]
+    );
+  };
+
+  const toggleAllEntries = () => {
+    if (selectedEntries.length === filteredEntries.length) {
+      setSelectedEntries([]);
+    } else {
+      setSelectedEntries(filteredEntries.map((entry) => entry.id));
+    }
+  };
+
+  const renderEntries = () => {
+    if (filteredEntries.length === 0) {
+      return (
+        <div className="bg-surface rounded-xl shadow-lg p-6 text-center">
+          <p className="text-secondary">No entries found</p>
+        </div>
+      );
+    }
+
+    const layoutProps = {
+      entries: filteredEntries,
+      tags,
+      selectedEntries,
+      onSelect: toggleEntrySelection,
+      onEdit: (id: string) => router.push(`/journal/${id}`),
+      onDelete: handleDelete,
+    };
+
+    switch (layoutMode) {
+      case 'grid':
+        return <GridLayout {...layoutProps} />;
+      case 'compact':
+        return <CompactLayout {...layoutProps} />;
+      default:
+        return <ListLayout {...layoutProps} />;
     }
   };
 
@@ -52,28 +146,69 @@ export default function EntriesPage() {
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <h1 className="text-3xl font-bold text-primary">Journal Entries</h1>
+              <div className="flex items-center gap-4">
+                <h1 className="text-3xl font-bold text-primary">Journal Entries</h1>
+                {viewMode === 'list' && filteredEntries.length > 0 && (
+                  <button
+                    onClick={toggleAllEntries}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#2a2a2a] text-white hover:bg-[#333] transition-colors duration-200"
+                  >
+                    {selectedEntries.length === filteredEntries.length ? (
+                      <RiCheckboxFill className="w-4 h-4 text-[#00ff9d]" />
+                    ) : (
+                      <RiCheckboxBlankLine className="w-4 h-4" />
+                    )}
+                    <span className="text-sm">
+                      {selectedEntries.length > 0
+                        ? `Selected ${selectedEntries.length}`
+                        : 'Select All'}
+                    </span>
+                  </button>
+                )}
+              </div>
               <div className="flex gap-4">
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-lg ${
-                    viewMode === 'list'
-                      ? 'bg-primary text-white'
-                      : 'bg-surface text-secondary hover:bg-surface-hover'
-                  }`}
-                >
-                  <RiListUnordered className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => setViewMode('calendar')}
-                  className={`p-2 rounded-lg ${
-                    viewMode === 'calendar'
-                      ? 'bg-primary text-white'
-                      : 'bg-surface text-secondary hover:bg-surface-hover'
-                  }`}
-                >
-                  <RiCalendarLine className="w-5 h-5" />
-                </button>
+                <ExportMenu
+                  entries={selectedEntries.length > 0
+                    ? filteredEntries.filter((entry) => selectedEntries.includes(entry.id))
+                    : filteredEntries}
+                  tags={tags}
+                  onExport={handleExport}
+                />
+                {viewMode === 'list' && (
+                  <LayoutSelector value={layoutMode} onChange={setLayoutMode} />
+                )}
+                <div className="flex gap-1 bg-[#2a2a2a] p-1 rounded-lg">
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`p-2 rounded-lg transition-colors duration-200 ${
+                      viewMode === 'list'
+                        ? 'bg-[#00ff9d] text-black'
+                        : 'text-[#888] hover:text-white'
+                    }`}
+                  >
+                    <RiBarChartLine className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('calendar')}
+                    className={`p-2 rounded-lg transition-colors duration-200 ${
+                      viewMode === 'calendar'
+                        ? 'bg-[#00ff9d] text-black'
+                        : 'text-[#888] hover:text-white'
+                    }`}
+                  >
+                    <RiCalendarLine className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('analytics')}
+                    className={`p-2 rounded-lg transition-colors duration-200 ${
+                      viewMode === 'analytics'
+                        ? 'bg-[#00ff9d] text-black'
+                        : 'text-[#888] hover:text-white'
+                    }`}
+                  >
+                    <RiBarChartLine className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -85,113 +220,46 @@ export default function EntriesPage() {
                   className="w-full"
                 />
 
-                <div className="bg-surface rounded-xl shadow-lg p-6">
-                  <h2 className="text-lg font-semibold text-primary mb-4">
-                    Filter by Tags
-                  </h2>
-                  <Tags
-                    selectedTags={selectedTags}
-                    availableTags={tags}
-                    onTagSelect={(tagId) => setSelectedTags([...selectedTags, tagId])}
-                    onTagRemove={(tagId) =>
-                      setSelectedTags(selectedTags.filter((id) => id !== tagId))
-                    }
-                  />
-                </div>
+                <FilterPanel
+                  selectedTags={selectedTags}
+                  availableTags={tags}
+                  onTagSelect={(tagId) => setSelectedTags([...selectedTags, tagId])}
+                  onTagRemove={(tagId) => {
+                    setSelectedTags(selectedTags.filter((id) => id !== tagId));
+                    removeTag(tagId);
+                  }}
+                  selectedMoods={selectedMoods}
+                  onMoodSelect={(mood) => setSelectedMoods([...selectedMoods, mood])}
+                  onMoodRemove={(mood) =>
+                    setSelectedMoods(selectedMoods.filter((m) => m !== mood))
+                  }
+                  dateRange={dateRange}
+                  onDateRangeChange={setDateRange}
+                />
               </div>
 
               <div className="lg:col-span-3">
-                {viewMode === 'calendar' ? (
+                {viewMode === 'analytics' ? (
+                  <Analytics entries={filteredEntries} />
+                ) : viewMode === 'calendar' ? (
                   <Calendar
-                    entries={entries.map((entry) => ({
+                    entries={filteredEntries.map((entry) => ({
                       id: entry.id,
                       date: entry.date,
                       title: entry.title,
                     }))}
                     onDateSelect={(date) => {
-                      const entriesOnDate = entries.filter(
+                      const entriesOnDate = filteredEntries.filter(
                         (entry) =>
                           new Date(entry.date).toDateString() === date.toDateString()
                       );
                       if (entriesOnDate.length === 1) {
                         router.push(`/journal/${entriesOnDate[0].id}`);
                       }
-                      // If multiple entries, we could show a modal or expand the list view
                     }}
                   />
                 ) : (
-                  <div className="space-y-4">
-                    {filteredEntries.length === 0 ? (
-                      <div className="bg-surface rounded-xl shadow-lg p-6 text-center">
-                        <p className="text-secondary">No entries found</p>
-                      </div>
-                    ) : (
-                      filteredEntries.map((entry) => (
-                        <div
-                          key={entry.id}
-                          className="bg-surface rounded-xl shadow-lg p-6"
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h2 className="text-xl font-semibold text-primary mb-2">
-                                {entry.title}
-                              </h2>
-                              <p className="text-sm text-secondary mb-4">
-                                {new Date(entry.date).toLocaleDateString()} at{' '}
-                                {new Date(entry.date).toLocaleTimeString()}
-                              </p>
-                              <div
-                                className="prose dark:prose-invert line-clamp-3"
-                                dangerouslySetInnerHTML={{ __html: entry.content }}
-                              />
-                              {entry.tags.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mt-4">
-                                  {entry.tags.map((tagId) => {
-                                    const tag = tags.find((t) => t.id === tagId);
-                                    if (!tag) return null;
-                                    return (
-                                      <span
-                                        key={tag.id}
-                                        className="tag"
-                                        style={
-                                          tag.color
-                                            ? {
-                                                borderColor: tag.color,
-                                                color: tag.color,
-                                              }
-                                            : undefined
-                                        }
-                                      >
-                                        {tag.name}
-                                      </span>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => router.push(`/journal/${entry.id}`)}
-                                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20"
-                                title="Edit entry"
-                              >
-                                <RiEdit2Line className="w-5 h-5" />
-                                <span>Edit</span>
-                              </button>
-                              <button
-                                onClick={() => handleDelete(entry.id)}
-                                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20"
-                                title="Delete entry"
-                              >
-                                <RiDeleteBinLine className="w-5 h-5" />
-                                <span>Delete</span>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  renderEntries()
                 )}
               </div>
             </div>

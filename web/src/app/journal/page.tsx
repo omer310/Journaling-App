@@ -4,26 +4,31 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { Tags } from '@/components/Tags';
+import { MoodSelector } from '@/components/MoodSelector';
 import { useStore } from '@/store/useStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
+
+type Mood = 'happy' | 'neutral' | 'sad';
 
 export default function JournalPage() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [mood, setMood] = useState<Mood>();
   const [saving, setSaving] = useState(false);
 
-  const { tags, addEntry, addTag } = useStore();
+  const { tags, addEntry, addTag, removeTag } = useStore();
 
   useEffect(() => {
     // Load draft from localStorage if exists
     const draft = localStorage.getItem('journal-draft');
     if (draft) {
-      const { title: draftTitle, content: draftContent, tags: draftTags } = JSON.parse(draft);
+      const { title: draftTitle, content: draftContent, tags: draftTags, mood: draftMood } = JSON.parse(draft);
       setTitle(draftTitle || '');
       setContent(draftContent || '');
       setSelectedTags(draftTags || []);
+      setMood(draftMood);
     }
   }, []);
 
@@ -33,9 +38,10 @@ export default function JournalPage() {
       title,
       content,
       tags: selectedTags,
+      mood,
     };
     localStorage.setItem('journal-draft', JSON.stringify(draft));
-  }, [title, content, selectedTags]);
+  }, [title, content, selectedTags, mood]);
 
   const handleSave = async () => {
     if (!title.trim() || !content.trim()) return;
@@ -47,6 +53,7 @@ export default function JournalPage() {
         content: content.trim(),
         date: new Date().toISOString(),
         tags: selectedTags,
+        mood,
       });
 
       // Clear draft
@@ -56,6 +63,7 @@ export default function JournalPage() {
       setTitle('');
       setContent('');
       setSelectedTags([]);
+      setMood(undefined);
       
       // Navigate to entries page
       router.push('/entries');
@@ -98,11 +106,19 @@ export default function JournalPage() {
                 selectedTags={selectedTags}
                 availableTags={tags}
                 onTagSelect={(tagId) => setSelectedTags([...selectedTags, tagId])}
-                onTagRemove={(tagId) =>
-                  setSelectedTags(selectedTags.filter((id) => id !== tagId))
-                }
+                onTagRemove={(tagId) => {
+                  setSelectedTags(selectedTags.filter((id) => id !== tagId));
+                  removeTag(tagId);
+                }}
                 onTagCreate={handleCreateTag}
               />
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-secondary mb-2">
+                How are you feeling?
+              </label>
+              <MoodSelector value={mood} onChange={setMood} />
             </div>
 
             <RichTextEditor
@@ -118,6 +134,7 @@ export default function JournalPage() {
                   setTitle('');
                   setContent('');
                   setSelectedTags([]);
+                  setMood(undefined);
                   localStorage.removeItem('journal-draft');
                 }}
                 className="px-6 py-2 bg-surface-hover text-secondary rounded-lg hover:bg-border transition-colors duration-200"

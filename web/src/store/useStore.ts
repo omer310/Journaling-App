@@ -48,6 +48,7 @@ interface JournalEntry {
   lastModified: string;
   userId?: string;
   source?: 'web' | 'mobile';
+  mood?: 'happy' | 'neutral' | 'sad';
 }
 
 interface Theme {
