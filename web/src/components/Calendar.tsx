@@ -85,7 +85,7 @@ export function Calendar({ entries, onDateSelect }: CalendarProps) {
   };
 
   return (
-    <div className="bg-white dark:bg-dark-card rounded-xl shadow-lg p-6">
+    <div className="bg-surface dark:bg-dark-card rounded-xl shadow-lg p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <h2 className="text-xl font-semibold text-primary">
