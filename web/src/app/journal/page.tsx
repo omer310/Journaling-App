@@ -1,5 +1,6 @@
 'use client';
 
+import 'regenerator-runtime/runtime';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { RichTextEditor } from '@/components/RichTextEditor';
@@ -48,7 +49,7 @@ export default function JournalPage() {
 
     setSaving(true);
     try {
-      addEntry({
+      await addEntry({
         title: title.trim(),
         content: content.trim(),
         date: new Date().toISOString(),

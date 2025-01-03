@@ -139,19 +139,31 @@ export const useStore = create<AppState>()(
       setEntries: (entries) => set({ entries }),
       addEntry: async (entry) => {
         const userId = auth.currentUser?.uid;
-        if (!userId) return;
+        if (!userId) {
+          throw new Error('User not authenticated');
+        }
 
-        const newEntry: Omit<JournalEntry, 'id'> = {
-          ...entry,
+        // Create a new entry object without undefined values
+        const entryData = {
+          title: entry.title.trim(),
+          content: entry.content.trim(),
+          date: entry.date,
+          tags: entry.tags || [],
           userId,
           source: 'web',
           lastModified: new Date().toISOString(),
         };
 
+        // Only add mood if it's defined
+        if (entry.mood) {
+          Object.assign(entryData, { mood: entry.mood });
+        }
+
         try {
-          await addDoc(collection(db, 'journal_entries'), newEntry);
+          await addDoc(collection(db, 'journal_entries'), entryData);
         } catch (error) {
           console.error('Error adding entry:', error);
+          throw error;
         }
       },
       updateEntry: async (id, entry) => {
@@ -246,6 +258,7 @@ auth.onAuthStateChanged((user) => {
               lastModified: data.lastModified || new Date().toISOString(),
               userId: data.userId,
               source: data.source,
+              mood: data.mood,
             });
           });
           // Sort entries by lastModified in descending order
