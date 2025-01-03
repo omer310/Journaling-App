@@ -12,6 +12,7 @@ import {
   doc
 } from 'firebase/firestore';
 import { auth } from '@/components/AuthProvider';
+import { encryptData, decryptData, isEncrypted } from '@/lib/encryption';
 
 const db = getFirestore();
 
@@ -145,8 +146,8 @@ export const useStore = create<AppState>()(
 
         // Create a new entry object without undefined values
         const entryData = {
-          title: entry.title.trim(),
-          content: entry.content.trim(),
+          title: await encryptData(entry.title.trim()),
+          content: await encryptData(entry.content.trim()),
           date: entry.date,
           tags: entry.tags || [],
           userId,
@@ -170,16 +171,29 @@ export const useStore = create<AppState>()(
         const userId = auth.currentUser?.uid;
         if (!userId) return;
 
-        const updatedEntry = {
-          ...entry,
+        const updatedEntry: any = {
           lastModified: new Date().toISOString(),
         };
+
+        // Encrypt fields that need encryption
+        if (entry.title !== undefined) {
+          updatedEntry.title = await encryptData(entry.title.trim());
+        }
+        if (entry.content !== undefined) {
+          updatedEntry.content = await encryptData(entry.content.trim());
+        }
+
+        // Copy other fields as is
+        if (entry.tags !== undefined) updatedEntry.tags = entry.tags;
+        if (entry.mood !== undefined) updatedEntry.mood = entry.mood;
+        if (entry.date !== undefined) updatedEntry.date = entry.date;
 
         try {
           const docRef = doc(db, 'journal_entries', id);
           await updateDoc(docRef, updatedEntry);
         } catch (error) {
           console.error('Error updating entry:', error);
+          throw error;
         }
       },
       removeEntry: async (id) => {
@@ -245,22 +259,32 @@ auth.onAuthStateChanged((user) => {
 
       unsubscribe = onSnapshot(
         q,
-        (snapshot) => {
+        async (snapshot) => {
           const entries: JournalEntry[] = [];
-          snapshot.forEach((doc) => {
+          for (const doc of snapshot.docs) {
             const data = doc.data();
-            entries.push({
-              id: doc.id,
-              title: data.title || '',
-              content: data.content || '',
-              date: data.date || new Date().toISOString(),
-              tags: data.tags || [],
-              lastModified: data.lastModified || new Date().toISOString(),
-              userId: data.userId,
-              source: data.source,
-              mood: data.mood,
-            });
-          });
+            try {
+              // Decrypt the title and content if they're encrypted
+              const title = isEncrypted(data.title) ? await decryptData(data.title) : data.title;
+              const content = isEncrypted(data.content) ? await decryptData(data.content) : data.content;
+
+              entries.push({
+                id: doc.id,
+                title: title || '',
+                content: content || '',
+                date: data.date || new Date().toISOString(),
+                tags: data.tags || [],
+                lastModified: data.lastModified || new Date().toISOString(),
+                userId: data.userId,
+                source: data.source,
+                mood: data.mood,
+              });
+            } catch (error) {
+              console.error('Error decrypting entry:', error);
+              // Skip this entry if decryption fails
+              continue;
+            }
+          }
           // Sort entries by lastModified in descending order
           entries.sort((a, b) => 
             new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
