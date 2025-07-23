@@ -1,6 +1,5 @@
-import { auth } from './firebase';
+import { supabase } from './supabase';
 
-// Convert string to ArrayBuffer
 function str2ab(str: string): ArrayBuffer {
   const buf = new ArrayBuffer(str.length);
   const bufView = new Uint8Array(buf);
@@ -10,12 +9,10 @@ function str2ab(str: string): ArrayBuffer {
   return buf;
 }
 
-// Convert ArrayBuffer to string
 function ab2str(buf: ArrayBuffer): string {
   return String.fromCharCode.apply(null, Array.from(new Uint8Array(buf)));
 }
 
-// Generate an encryption key from the user's UID
 async function generateKey(userId: string): Promise<CryptoKey> {
   const encoder = new TextEncoder();
   const keyMaterial = await window.crypto.subtle.importKey(
@@ -40,12 +37,11 @@ async function generateKey(userId: string): Promise<CryptoKey> {
   );
 }
 
-// Encrypt data
 export async function encryptData(data: string): Promise<string> {
-  const userId = auth.currentUser?.uid;
-  if (!userId) throw new Error('User not authenticated');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
 
-  const key = await generateKey(userId);
+  const key = await generateKey(user.id);
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const encoder = new TextEncoder();
 
@@ -58,24 +54,20 @@ export async function encryptData(data: string): Promise<string> {
     encoder.encode(data)
   );
 
-  // Combine IV and encrypted data
   const combined = new Uint8Array(iv.length + encryptedData.byteLength);
   combined.set(iv);
   combined.set(new Uint8Array(encryptedData), iv.length);
 
-  // Convert to base64 for storage
   return btoa(ab2str(combined.buffer));
 }
 
-// Decrypt data
 export async function decryptData(encryptedData: string): Promise<string> {
-  const userId = auth.currentUser?.uid;
-  if (!userId) throw new Error('User not authenticated');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
 
-  const key = await generateKey(userId);
+  const key = await generateKey(user.id);
   const decoder = new TextDecoder();
 
-  // Convert from base64 and separate IV and data
   const combined = new Uint8Array(str2ab(atob(encryptedData)));
   const iv = combined.slice(0, 12);
   const data = combined.slice(12);
@@ -97,7 +89,6 @@ export async function decryptData(encryptedData: string): Promise<string> {
   }
 }
 
-// Helper function to check if a string is encrypted
 export function isEncrypted(data: string): boolean {
   try {
     atob(data);

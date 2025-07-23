@@ -2,27 +2,26 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { FirebaseError } from 'firebase/app';
-import { auth } from '@/components/AuthProvider';
+import { supabase } from '@/lib/supabase';
 import { SocialAuth } from '@/components/SocialAuth';
 import Link from 'next/link';
 
-const getErrorMessage = (error: FirebaseError) => {
-  switch (error.code) {
-    case 'auth/invalid-credential':
-    case 'auth/wrong-password':
-    case 'auth/user-not-found':
+const getErrorMessage = (error: any) => {
+  if (error.message) {
+    if (error.message.includes('Invalid login credentials')) {
       return 'Invalid email or password. Please try again.';
-    case 'auth/invalid-email':
+    }
+    if (error.message.includes('Invalid email')) {
       return 'Invalid email address. Please enter a valid email.';
-    case 'auth/user-disabled':
-      return 'This account has been disabled. Please contact support.';
-    case 'auth/too-many-requests':
+    }
+    if (error.message.includes('Email not confirmed')) {
+      return 'Please check your email and confirm your account.';
+    }
+    if (error.message.includes('Too many requests')) {
       return 'Too many failed attempts. Please try again later.';
-    default:
-      return 'Failed to log in. Please try again.';
+    }
   }
+  return 'Failed to log in. Please try again.';
 };
 
 export default function LoginPage() {
@@ -43,94 +42,96 @@ export default function LoginPage() {
     try {
       setLoading(true);
       setError('');
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push('/journal');
-    } catch (error: unknown) {
-      if (error instanceof FirebaseError) {
-        // Don't log the error to console in production
-        if (process.env.NODE_ENV === 'development') {
-          console.debug('Login error:', error.code);
-        }
-        setError(getErrorMessage(error));
-      } else {
-        setError('An unexpected error occurred. Please try again.');
+      
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
       }
+
+      router.push('/journal');
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('Login error:', error);
+      }
+      setError(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="max-w-md w-full space-y-8 bg-surface rounded-xl shadow-lg p-8">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <h2 className="mt-6 text-3xl font-bold text-primary">
-            Welcome Back
-          </h2>
-          <p className="mt-2 text-sm text-secondary">
-            Sign in to continue your journaling journey
-          </p>
+          <h1 className="text-3xl font-bold text-primary">Welcome Back</h1>
+          <p className="mt-2 text-muted-foreground">Sign in to your account</p>
+        </div>
+
+        <form onSubmit={handleLogin} className="space-y-6">
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-md">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+              placeholder="Enter your email"
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+              placeholder="Enter your password"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-primary text-primary-foreground py-2 px-4 rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Signing in...' : 'Sign In'}
+          </button>
+        </form>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+          </div>
         </div>
 
         <SocialAuth />
 
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          {error && (
-            <div className="text-red-500 text-sm text-center">{error}</div>
-          )}
-
-          <div className="rounded-md shadow-sm space-y-4">
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-border bg-surface placeholder-text-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-border bg-surface placeholder-text-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </div>
-        </form>
-
         <div className="text-center">
-          <p className="text-sm text-secondary">
-            Don&apos;t have an account?{' '}
-            <Link
-              href="/register"
-              className="font-medium text-primary hover:text-primary-dark"
-            >
+          <p className="text-sm text-muted-foreground">
+            Don't have an account?{' '}
+            <Link href="/register" className="text-primary hover:underline">
               Sign up
             </Link>
           </p>

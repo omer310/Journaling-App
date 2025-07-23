@@ -1,32 +1,27 @@
 'use client';
 
 import { useState } from 'react';
-import { 
-  GoogleAuthProvider, 
-  signInWithPopup,
-} from 'firebase/auth';
-import { FirebaseError } from 'firebase/app';
-import { auth } from './AuthProvider';
+import { supabase } from '@/lib/supabase';
 import { RiGoogleFill } from 'react-icons/ri';
 import { useRouter } from 'next/navigation';
 import { usePathname } from 'next/navigation';
 
-const getGoogleErrorMessage = (error: FirebaseError) => {
-  switch (error.code) {
-    case 'auth/popup-closed-by-user':
-    case 'auth/cancelled-popup-request':
+const getGoogleErrorMessage = (error: any) => {
+  if (error.message) {
+    if (error.message.includes('popup closed')) {
       return 'Sign in was cancelled. Please try again.';
-    case 'auth/popup-blocked':
+    }
+    if (error.message.includes('popup blocked')) {
       return 'Pop-up was blocked by your browser. Please allow pop-ups and try again.';
-    case 'auth/account-exists-with-different-credential':
+    }
+    if (error.message.includes('account exists')) {
       return 'An account already exists with this email using a different sign-in method.';
-    case 'auth/unauthorized-domain':
+    }
+    if (error.message.includes('unauthorized domain')) {
       return 'This domain is not authorized for Google sign-in.';
-    case 'auth/operation-not-allowed':
-      return 'Google sign-in is not enabled. Please contact support.';
-    default:
-      return 'Failed to sign in with Google. Please try again.';
+    }
   }
+  return 'Failed to sign in with Google. Please try again.';
 };
 
 export function SocialAuth() {
@@ -40,24 +35,22 @@ export function SocialAuth() {
     try {
       setError(null);
       setLoading(true);
-      const provider = new GoogleAuthProvider();
-      provider.addScope('profile');
-      provider.addScope('email');
-      provider.setCustomParameters({
-        prompt: 'select_account'
+      
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/journal`,
+        },
       });
-      await signInWithPopup(auth, provider);
-      router.push('/journal');
-    } catch (error) {
-      if (error instanceof FirebaseError) {
-        // Only log in development
-        if (process.env.NODE_ENV === 'development') {
-          console.debug('Google sign in error:', error.code);
-        }
-        setError(getGoogleErrorMessage(error));
-      } else {
-        setError('An unexpected error occurred. Please try again.');
+
+      if (error) {
+        throw error;
       }
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('Google sign in error:', error);
+      }
+      setError(getGoogleErrorMessage(error));
     } finally {
       setLoading(false);
     }

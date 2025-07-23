@@ -22,6 +22,22 @@ import { exportToPdf, exportToMarkdown, exportToText } from '@/services/export';
 type ViewMode = 'list' | 'calendar' | 'analytics';
 type Mood = 'happy' | 'neutral' | 'sad';
 
+// Helper function to safely get tags array
+function getTagsArray(tags: any): string[] {
+  if (Array.isArray(tags)) {
+    return tags;
+  }
+  if (typeof tags === 'string') {
+    try {
+      const parsed = JSON.parse(tags);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 export default function EntriesPage() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -30,7 +46,7 @@ export default function EntriesPage() {
   const [selectedMoods, setSelectedMoods] = useState<Mood[]>([]);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [selectedEntries, setSelectedEntries] = useState<string[]>([]);
-  const { entries, tags, removeEntry, removeTag, searchEntries } = useStore();
+  const { entries = [], tags = [], removeEntry, removeTag, searchEntries } = useStore();
 
   const handleSearch = async (query: string) => {
     const results = searchEntries(query);
@@ -44,9 +60,11 @@ export default function EntriesPage() {
     router.push(`/journal/${result.id}`);
   };
 
-  const filteredEntries = entries.filter((entry) => {
+  const filteredEntries = (entries || []).filter((entry) => {
+    const entryTags = getTagsArray(entry.tags);
+    
     // Filter by tags
-    if (selectedTags.length > 0 && !selectedTags.every((tagId) => entry.tags.includes(tagId))) {
+    if (selectedTags.length > 0 && !selectedTags.every((tagId) => entryTags.includes(tagId))) {
       return false;
     }
 
@@ -113,7 +131,7 @@ export default function EntriesPage() {
   };
 
   const renderEntries = () => {
-    if (filteredEntries.length === 0) {
+    if (!filteredEntries || filteredEntries.length === 0) {
       return (
         <div className="bg-surface rounded-xl shadow-lg p-6 text-center">
           <p className="text-secondary">No entries found</p>
@@ -123,7 +141,7 @@ export default function EntriesPage() {
 
     const layoutProps = {
       entries: filteredEntries,
-      tags,
+      tags: tags || [],
       selectedEntries,
       onSelect: toggleEntrySelection,
       onEdit: (id: string) => router.push(`/journal/${id}`),
@@ -171,7 +189,7 @@ export default function EntriesPage() {
                   entries={selectedEntries.length > 0
                     ? filteredEntries.filter((entry) => selectedEntries.includes(entry.id))
                     : filteredEntries}
-                  tags={tags}
+                  tags={tags || []}
                   onExport={handleExport}
                 />
                 {viewMode === 'list' && (
@@ -222,7 +240,7 @@ export default function EntriesPage() {
 
                 <FilterPanel
                   selectedTags={selectedTags}
-                  availableTags={tags}
+                  availableTags={tags || []}
                   onTagSelect={(tagId) => setSelectedTags([...selectedTags, tagId])}
                   onTagRemove={(tagId) => {
                     setSelectedTags(selectedTags.filter((id) => id !== tagId));

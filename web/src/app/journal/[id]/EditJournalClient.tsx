@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useStore } from '@/store/useStore';
+import { supabase } from '@/lib/supabase';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { Tags } from '@/components/Tags';
-import { useStore } from '@/store/useStore';
+import { MoodSelector } from '@/components/MoodSelector';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { auth } from '@/components/AuthProvider';
-import { onSnapshot, doc, getFirestore } from 'firebase/firestore';
 
 interface EditJournalClientProps {
   params: {
@@ -15,54 +15,70 @@ interface EditJournalClientProps {
   };
 }
 
-const db = getFirestore();
+// Helper function to safely get tags array
+function getTagsArray(tags: any): string[] {
+  if (Array.isArray(tags)) {
+    return tags;
+  }
+  if (typeof tags === 'string') {
+    try {
+      const parsed = JSON.parse(tags);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
 
 export function EditJournalClient({ params }: EditJournalClientProps) {
   const router = useRouter();
+  const { entries, tags, updateEntry, addTag } = useStore();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
+  const [mood, setMood] = useState<'happy' | 'neutral' | 'sad' | undefined>(undefined);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  const { tags, entries, updateEntry, addTag } = useStore();
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+    };
+
+    checkAuth();
+  }, [router]);
 
   useEffect(() => {
-    // Check if user is authenticated
-    if (!auth.currentUser) {
-      router.push('/login');
-      return;
-    }
-
-    console.log('Current entries:', entries);
-    console.log('Looking for entry with ID:', params.id);
-
-    // First try to find the entry in the store
+    // First, try to find the entry in the store
     const entry = entries.find((e) => e.id === params.id);
     if (entry) {
       console.log('Found entry in store:', entry);
       setTitle(entry.title);
       setContent(entry.content);
-      setSelectedTags(entry.tags || []);
+      setSelectedTags(getTagsArray(entry.tags));
+      setMood(entry.mood);
       setLoading(false);
       return;
     }
 
-    // If not found in store, try to fetch directly from Firestore
-    const unsubscribe = onSnapshot(
-      doc(db, 'journal_entries', params.id),
-      (doc) => {
-        if (doc.exists()) {
-          console.log('Found entry in Firestore:', doc.data());
-          const data = doc.data();
-          setTitle(data.title || '');
-          setContent(data.content || '');
-          setSelectedTags(data.tags || []);
-          setLoading(false);
-        } else {
-          console.log('Entry not found in Firestore');
+    // If not found in store, try to fetch directly from Supabase
+    const fetchEntry = async () => {
+      try {
+        const { data: entry, error } = await supabase
+          .from('journal_entries')
+          .select('*')
+          .eq('id', params.id)
+          .single();
+
+        if (error || !entry) {
+          console.log('Entry not found in Supabase');
           if (retryCount < 3) {
             // Retry a few times before showing error
             setTimeout(() => {
@@ -72,16 +88,23 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
             setError('Entry not found. Please try again.');
             setLoading(false);
           }
+          return;
         }
-      },
-      (error) => {
+
+        console.log('Found entry in Supabase:', entry);
+        setTitle(entry.title || '');
+        setContent(entry.content || '');
+        setSelectedTags(getTagsArray(entry.tags));
+        setMood(entry.mood);
+        setLoading(false);
+      } catch (error) {
         console.error('Error fetching entry:', error);
         setError('Failed to load entry. Please try again.');
         setLoading(false);
       }
-    );
+    };
 
-    return () => unsubscribe();
+    fetchEntry();
   }, [entries, params.id, router, retryCount]);
 
   const handleSave = async () => {
@@ -93,6 +116,7 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
         title: title.trim(),
         content: content.trim(),
         tags: selectedTags,
+        mood,
       });
 
       router.push('/entries');
@@ -122,14 +146,16 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-        <div className="text-2xl text-red-500">{error}</div>
-        <button
-          onClick={() => router.push('/entries')}
-          className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
-        >
-          Back to Entries
-        </button>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-xl text-destructive mb-4">{error}</div>
+          <button
+            onClick={() => router.push('/entries')}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          >
+            Back to Entries
+          </button>
+        </div>
       </div>
     );
   }
@@ -137,55 +163,70 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
-        <div className="max-w-5xl mx-auto px-4 py-8">
-          <div className="bg-surface rounded-xl shadow-lg p-6">
-            <div className="mb-6">
-              <input
-                type="text"
-                placeholder="Entry Title"
-                className="w-full text-3xl font-bold border-none focus:outline-none focus:ring-0 bg-transparent placeholder-text-secondary"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-              <div className="text-sm text-secondary mt-2">
-                {new Date().toLocaleDateString()}
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="flex flex-col gap-6">
+            <div className="flex items-center justify-between">
+              <h1 className="text-3xl font-bold text-primary">Edit Journal Entry</h1>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => router.push('/entries')}
+                  className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !title.trim() || !content.trim()}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
               </div>
             </div>
 
-            <div className="mb-6">
-              <Tags
-                selectedTags={selectedTags}
-                availableTags={tags}
-                onTagSelect={(tagId) => setSelectedTags([...selectedTags, tagId])}
-                onTagRemove={(tagId) =>
-                  setSelectedTags(selectedTags.filter((id) => id !== tagId))
-                }
-                onTagCreate={handleCreateTag}
-              />
-            </div>
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-primary mb-2">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface border border-border rounded-md text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Enter title..."
+                />
+              </div>
 
-            <RichTextEditor
-              content={content}
-              onChange={setContent}
-              placeholder="Write your thoughts here..."
-              autosave
-            />
+              <div>
+                <label className="block text-sm font-medium text-primary mb-2">
+                  Content
+                </label>
+                <RichTextEditor
+                  content={content}
+                  onChange={setContent}
+                />
+              </div>
 
-            <div className="mt-6 flex justify-end space-x-4">
-              <button
-                onClick={() => router.push('/entries')}
-                className="px-6 py-2 bg-surface-hover text-secondary rounded-lg hover:bg-border transition-colors duration-200"
-                disabled={saving}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !title.trim() || !content.trim()}
-                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
+              <div>
+                <label className="block text-sm font-medium text-primary mb-2">
+                  Tags
+                </label>
+                <Tags
+                  selectedTags={selectedTags}
+                  availableTags={tags}
+                  onTagSelect={(tagId) => setSelectedTags([...selectedTags, tagId])}
+                  onTagRemove={(tagId) => setSelectedTags(selectedTags.filter(id => id !== tagId))}
+                  onTagCreate={handleCreateTag}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-primary mb-2">
+                  Mood
+                </label>
+                <MoodSelector value={mood} onChange={setMood} />
+              </div>
             </div>
           </div>
         </div>

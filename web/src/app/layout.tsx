@@ -19,7 +19,9 @@ function RootLayoutContent({
   children: React.ReactNode;
 }) {
   const { currentTheme, setTheme, isOffline, setOfflineStatus } = useStore();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  console.log('RootLayoutContent: user=', user?.email, 'loading=', loading);
 
   useEffect(() => {
     // Theme setup
@@ -122,7 +124,12 @@ function RootLayoutContent({
                   )}
                 </button>
 
-                {user && <LogoutButton />}
+                {user && (
+                  <>
+                    {console.log('Rendering LogoutButton for user:', user.email)}
+                    <LogoutButton />
+                  </>
+                )}
               </div>
             </div>
           </div>

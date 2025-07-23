@@ -9,8 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@firebase/auth": "^1.8.1",
-    "@firebase/firestore": "^4.7.5",
+    "@supabase/supabase-js": "^2.52.0",
     "@tiptap/core": "^2.2.4",
     "@tiptap/extension-color": "^2.2.4",
     "@tiptap/extension-highlight": "^2.2.4",
@@ -30,7 +29,6 @@
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.10",
     "diff": "^7.0.0",
-    "firebase": "^11.1.0",
     "jspdf": "^2.5.2",
     "lodash": "^4.17.21",
     "next": "^14.2.15",

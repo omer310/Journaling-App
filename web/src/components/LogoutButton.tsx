@@ -1,8 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { signOut } from 'firebase/auth';
-import { auth } from './AuthProvider';
+import { supabase } from '@/lib/supabase';
 import { RiLogoutBoxLine } from 'react-icons/ri';
 
 export default function LogoutButton() {
@@ -10,8 +9,22 @@ export default function LogoutButton() {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
-      router.push('/login');
+      console.log('Logging out...');
+      
+      // Check current session first
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Current session:', session?.user?.email);
+      
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Supabase signOut error:', error);
+        throw error;
+      }
+      
+      console.log('Sign out successful, redirecting to login...');
+      
+      // Force a hard redirect to login page
+      window.location.href = '/login';
     } catch (error) {
       console.error('Logout error:', error);
       alert('Failed to log out. Please try again.');

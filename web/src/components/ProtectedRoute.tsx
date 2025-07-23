@@ -13,7 +13,9 @@ export default function ProtectedRoute({
   const router = useRouter();
 
   useEffect(() => {
+    console.log('ProtectedRoute: loading=', loading, 'user=', user?.email);
     if (!loading && !user) {
+      console.log('No user found, redirecting to login...');
       router.push('/login');
     }
   }, [user, loading, router]);

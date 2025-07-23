@@ -1,76 +1,60 @@
 'use client';
 
-import 'regenerator-runtime/runtime';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { Tags } from '@/components/Tags';
-import { MoodSelector } from '@/components/MoodSelector';
 import { useStore } from '@/store/useStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
-
-type Mood = 'happy' | 'neutral' | 'sad';
+import { supabase } from '@/lib/supabase';
 
 export default function JournalPage() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [mood, setMood] = useState<Mood>();
+  const [selectedMood, setSelectedMood] = useState<'happy' | 'neutral' | 'sad' | undefined>();
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const { tags, addEntry, addTag, removeTag } = useStore();
-
-  useEffect(() => {
-    // Load draft from localStorage if exists
-    const draft = localStorage.getItem('journal-draft');
-    if (draft) {
-      const { title: draftTitle, content: draftContent, tags: draftTags, mood: draftMood } = JSON.parse(draft);
-      setTitle(draftTitle || '');
-      setContent(draftContent || '');
-      setSelectedTags(draftTags || []);
-      setMood(draftMood);
-    }
-  }, []);
-
-  // Autosave draft
-  useEffect(() => {
-    const draft = {
-      title,
-      content,
-      tags: selectedTags,
-      mood,
-    };
-    localStorage.setItem('journal-draft', JSON.stringify(draft));
-  }, [title, content, selectedTags, mood]);
+  const { tags, addEntry, addTag } = useStore();
 
   const handleSave = async () => {
-    if (!title.trim() || !content.trim()) return;
+    if (!title.trim() || !content.trim()) {
+      setError('Please fill in both title and content');
+      return;
+    }
 
     setSaving(true);
+    setError('');
+
     try {
+      // First, let's check if the user is authenticated
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw new Error('Authentication error: ' + authError.message);
+      }
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('User authenticated:', user.id);
+
       await addEntry({
         title: title.trim(),
         content: content.trim(),
-        date: new Date().toISOString(),
+        date: new Date().toISOString().split('T')[0],
         tags: selectedTags,
-        mood,
+        mood: selectedMood,
       });
 
-      // Clear draft
-      localStorage.removeItem('journal-draft');
-      
-      // Reset form
-      setTitle('');
-      setContent('');
-      setSelectedTags([]);
-      setMood(undefined);
-      
-      // Navigate to entries page
       router.push('/entries');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save entry:', error);
-      alert('Failed to save entry. Please try again.');
+      setError(error.message || 'Failed to save entry. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -87,69 +71,80 @@ export default function JournalPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
-        <div className="max-w-5xl mx-auto px-4 py-8">
-          <div className="bg-surface rounded-xl shadow-lg p-6">
-            <div className="mb-6">
-              <input
-                type="text"
-                placeholder="Entry Title"
-                className="w-full text-3xl font-bold border-none focus:outline-none focus:ring-0 bg-transparent placeholder-text-secondary"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-              <div className="text-sm text-secondary mt-2">
-                {new Date().toLocaleDateString()}
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto space-y-6">
+            <div className="flex items-center justify-between">
+              <h1 className="text-3xl font-bold text-primary">New Entry</h1>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => router.push('/entries')}
+                  className="px-4 py-2 text-muted-foreground hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
               </div>
             </div>
 
-            <div className="mb-6">
+            {error && (
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-md">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Entry title..."
+                className="w-full p-3 text-xl font-semibold bg-transparent border-b border-border focus:outline-none focus:border-primary"
+              />
+
               <Tags
                 selectedTags={selectedTags}
                 availableTags={tags}
                 onTagSelect={(tagId) => setSelectedTags([...selectedTags, tagId])}
-                onTagRemove={(tagId) => {
-                  setSelectedTags(selectedTags.filter((id) => id !== tagId));
-                  removeTag(tagId);
-                }}
+                onTagRemove={(tagId) => setSelectedTags(selectedTags.filter(id => id !== tagId))}
                 onTagCreate={handleCreateTag}
               />
-            </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-secondary mb-2">
-                How are you feeling?
-              </label>
-              <MoodSelector value={mood} onChange={setMood} />
-            </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">How are you feeling?</label>
+                <div className="flex gap-4">
+                  {(['happy', 'neutral', 'sad'] as const).map((mood) => (
+                    <label key={mood} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="mood"
+                        value={mood}
+                        checked={selectedMood === mood}
+                        onChange={() => setSelectedMood(mood)}
+                        className="sr-only"
+                      />
+                      <div className={`px-4 py-2 rounded-full border-2 transition-colors ${
+                        selectedMood === mood
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border text-muted-foreground hover:border-primary/50'
+                      }`}>
+                        {mood.charAt(0).toUpperCase() + mood.slice(1)}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
 
-            <RichTextEditor
-              content={content}
-              onChange={setContent}
-              placeholder="Write your thoughts here..."
-              autosave
-            />
-
-            <div className="mt-6 flex justify-end space-x-4">
-              <button
-                onClick={() => {
-                  setTitle('');
-                  setContent('');
-                  setSelectedTags([]);
-                  setMood(undefined);
-                  localStorage.removeItem('journal-draft');
-                }}
-                className="px-6 py-2 bg-surface-hover text-secondary rounded-lg hover:bg-border transition-colors duration-200"
-                disabled={saving}
-              >
-                Clear
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !title.trim() || !content.trim()}
-                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? 'Saving...' : 'Save Entry'}
-              </button>
+              <RichTextEditor
+                content={content}
+                onChange={setContent}
+                placeholder="Start writing your thoughts..."
+              />
             </div>
           </div>
         </div>

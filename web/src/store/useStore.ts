@@ -1,20 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { 
-  collection, 
-  onSnapshot, 
-  query, 
-  where, 
-  getFirestore,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc
-} from 'firebase/firestore';
-import { auth } from '@/components/AuthProvider';
+import { supabase } from '@/lib/supabase';
 import { encryptData, decryptData, isEncrypted } from '@/lib/encryption';
-
-const db = getFirestore();
 
 // Create a custom storage that checks for window/localStorage availability
 const customStorage = {
@@ -83,6 +70,7 @@ interface AppState {
   addEntry: (entry: Omit<JournalEntry, 'id' | 'lastModified'>) => void;
   updateEntry: (id: string, entry: Partial<JournalEntry>) => void;
   removeEntry: (id: string) => void;
+  fetchEntries: () => Promise<void>;
   
   // Search
   searchEntries: (query: string) => JournalEntry[];
@@ -138,73 +126,159 @@ export const useStore = create<AppState>()(
       // Entries
       entries: [],
       setEntries: (entries) => set({ entries }),
-      addEntry: async (entry) => {
-        const userId = auth.currentUser?.uid;
-        if (!userId) {
-          throw new Error('User not authenticated');
-        }
-
-        // Create a new entry object without undefined values
-        const entryData = {
-          title: await encryptData(entry.title.trim()),
-          content: await encryptData(entry.content.trim()),
-          date: entry.date,
-          tags: entry.tags || [],
-          userId,
-          source: 'web',
-          lastModified: new Date().toISOString(),
-        };
-
-        // Only add mood if it's defined
-        if (entry.mood) {
-          Object.assign(entryData, { mood: entry.mood });
-        }
-
+      fetchEntries: async () => {
         try {
-          await addDoc(collection(db, 'journal_entries'), entryData);
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            console.log('No user authenticated, skipping fetch');
+            return;
+          }
+
+          const { data: entries, error } = await supabase
+            .from('journal_entries')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('last_modified', { ascending: false });
+
+          if (error) {
+            console.error('Error fetching entries:', error);
+            return;
+          }
+
+          const decryptedEntries: JournalEntry[] = [];
+          for (const entry of entries) {
+            try {
+              // Decrypt the title and content if they're encrypted
+              const title = isEncrypted(entry.title) ? await decryptData(entry.title) : entry.title;
+              const content = isEncrypted(entry.content) ? await decryptData(entry.content) : entry.content;
+
+              decryptedEntries.push({
+                id: entry.id,
+                title: title || '',
+                content: content || '',
+                date: entry.date,
+                tags: entry.tags || [],
+                lastModified: entry.last_modified,
+                userId: entry.user_id,
+                source: entry.source,
+                mood: entry.mood,
+              });
+            } catch (error) {
+              console.error('Error decrypting entry:', error);
+              // Skip this entry if decryption fails
+              continue;
+            }
+          }
+
+          set({ entries: decryptedEntries });
+        } catch (error) {
+          console.error('Error in fetchEntries:', error);
+        }
+      },
+      addEntry: async (entry) => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            throw new Error('User not authenticated');
+          }
+
+          // Create a new entry object without undefined values
+          const entryData = {
+            title: await encryptData(entry.title.trim()),
+            content: await encryptData(entry.content.trim()),
+            date: entry.date,
+            tags: entry.tags || [],
+            user_id: user.id,
+            source: 'web' as const,
+            last_modified: new Date().toISOString(),
+          };
+
+          // Only add mood if it's defined
+          if (entry.mood) {
+            Object.assign(entryData, { mood: entry.mood });
+          }
+
+          const { error } = await supabase
+            .from('journal_entries')
+            .insert(entryData);
+
+          if (error) {
+            console.error('Supabase error:', error);
+            throw error;
+          }
+
+          // Refresh entries after adding
+          await get().fetchEntries();
         } catch (error) {
           console.error('Error adding entry:', error);
           throw error;
         }
       },
       updateEntry: async (id, entry) => {
-        const userId = auth.currentUser?.uid;
-        if (!userId) return;
-
-        const updatedEntry: any = {
-          lastModified: new Date().toISOString(),
-        };
-
-        // Encrypt fields that need encryption
-        if (entry.title !== undefined) {
-          updatedEntry.title = await encryptData(entry.title.trim());
-        }
-        if (entry.content !== undefined) {
-          updatedEntry.content = await encryptData(entry.content.trim());
-        }
-
-        // Copy other fields as is
-        if (entry.tags !== undefined) updatedEntry.tags = entry.tags;
-        if (entry.mood !== undefined) updatedEntry.mood = entry.mood;
-        if (entry.date !== undefined) updatedEntry.date = entry.date;
-
         try {
-          const docRef = doc(db, 'journal_entries', id);
-          await updateDoc(docRef, updatedEntry);
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            throw new Error('User not authenticated');
+          }
+
+          const updatedEntry: any = {
+            last_modified: new Date().toISOString(),
+          };
+
+          // Encrypt fields that need encryption
+          if (entry.title !== undefined) {
+            updatedEntry.title = await encryptData(entry.title.trim());
+          }
+          if (entry.content !== undefined) {
+            updatedEntry.content = await encryptData(entry.content.trim());
+          }
+
+          // Copy other fields as is
+          if (entry.tags !== undefined) updatedEntry.tags = entry.tags;
+          if (entry.mood !== undefined) updatedEntry.mood = entry.mood;
+          if (entry.date !== undefined) updatedEntry.date = entry.date;
+
+          const { error } = await supabase
+            .from('journal_entries')
+            .update(updatedEntry)
+            .eq('id', id)
+            .eq('user_id', user.id);
+
+          if (error) {
+            console.error('Supabase error:', error);
+            throw error;
+          }
+
+          // Refresh entries after updating
+          await get().fetchEntries();
         } catch (error) {
           console.error('Error updating entry:', error);
           throw error;
         }
       },
       removeEntry: async (id) => {
-        const userId = auth.currentUser?.uid;
-        if (!userId) return;
-
         try {
-          const docRef = doc(db, 'journal_entries', id);
-          await deleteDoc(docRef);
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            throw new Error('User not authenticated');
+          }
+
+          const { error } = await supabase
+            .from('journal_entries')
+            .delete()
+            .eq('id', id)
+            .eq('user_id', user.id);
+
+          if (error) {
+            console.error('Supabase error:', error);
+            throw error;
+          }
+
+          // Refresh entries after deleting
+          await get().fetchEntries();
         } catch (error) {
           console.error('Error deleting entry:', error);
+          throw error;
         }
       },
 
@@ -245,69 +319,48 @@ export const useStore = create<AppState>()(
   )
 );
 
-// Set up Firebase sync
-auth.onAuthStateChanged((user) => {
-  if (user) {
-    // Unsubscribe from previous listener if exists
-    let unsubscribe: (() => void) | undefined;
+// Set up Supabase sync
+let currentChannel: any = null;
 
-    const setupSync = () => {
-      const q = query(
-        collection(db, 'journal_entries'),
-        where('userId', '==', user.uid)
-      );
+supabase.auth.onAuthStateChange(async (event, session) => {
+  console.log('Auth state change:', event, session?.user?.email);
+  
+  if (session?.user) {
+    // Fetch initial entries
+    await useStore.getState().fetchEntries();
 
-      unsubscribe = onSnapshot(
-        q,
-        async (snapshot) => {
-          const entries: JournalEntry[] = [];
-          for (const doc of snapshot.docs) {
-            const data = doc.data();
-            try {
-              // Decrypt the title and content if they're encrypted
-              const title = isEncrypted(data.title) ? await decryptData(data.title) : data.title;
-              const content = isEncrypted(data.content) ? await decryptData(data.content) : data.content;
+    // Set up real-time subscription
+    if (currentChannel) {
+      supabase.removeChannel(currentChannel);
+    }
 
-              entries.push({
-                id: doc.id,
-                title: title || '',
-                content: content || '',
-                date: data.date || new Date().toISOString(),
-                tags: data.tags || [],
-                lastModified: data.lastModified || new Date().toISOString(),
-                userId: data.userId,
-                source: data.source,
-                mood: data.mood,
-              });
-            } catch (error) {
-              console.error('Error decrypting entry:', error);
-              // Skip this entry if decryption fails
-              continue;
-            }
-          }
-          // Sort entries by lastModified in descending order
-          entries.sort((a, b) => 
-            new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
-          );
-          useStore.getState().setEntries(entries);
+    currentChannel = supabase
+      .channel('journal_entries')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'journal_entries',
+          filter: `user_id=eq.${session.user.id}`,
         },
-        (error) => {
-          console.error('Error fetching entries:', error);
+        async (payload) => {
+          console.log('Real-time update:', payload);
+          
+          // Refetch all entries to ensure consistency
+          await useStore.getState().fetchEntries();
         }
-      );
-    };
-
-    // Initial setup
-    setupSync();
-
-    // Cleanup on user change
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
+      )
+      .subscribe();
   } else {
+    console.log('User logged out, clearing data...');
     // Clear entries when user logs out
     useStore.getState().setEntries([]);
+    
+    // Clean up channel
+    if (currentChannel) {
+      supabase.removeChannel(currentChannel);
+      currentChannel = null;
+    }
   }
 }); 
