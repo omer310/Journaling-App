@@ -1,44 +1,29 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  doc, 
-  setDoc, 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  Timestamp,
-  initializeFirestore
-} from 'firebase/firestore';
-import { getAuth, signInWithEmailAndPassword, initializeAuth, indexedDBLocalPersistence } from 'firebase/auth';
+import { supabase } from '../config/supabase';
 import { storage, JournalEntry } from './storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { firebaseConfig } from '../config/firebase';
-
-// Initialize Firebase only if it hasn't been initialized
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-
-// Initialize Auth with proper persistence
-const auth = getApps().length === 0 
-  ? initializeAuth(app, {
-      persistence: indexedDBLocalPersistence
-    })
-  : getAuth(app);
-
-const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-});
+import { encryptData } from '../lib/encryption';
 
 export const sync = {
   async signIn(email: string, password: string) {
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
       // Store auth state in AsyncStorage
-      await AsyncStorage.setItem('auth_user', JSON.stringify({
-        uid: userCredential.user.uid,
-        email: userCredential.user.email,
-      }));
-      return userCredential.user;
+      if (data.user) {
+        await AsyncStorage.setItem('auth_user', JSON.stringify({
+          uid: data.user.id,
+          email: data.user.email,
+        }));
+      }
+
+      return data.user;
     } catch (error) {
       console.error('Error signing in:', error);
       throw error;
@@ -47,23 +32,46 @@ export const sync = {
 
   async syncEntry(entry: JournalEntry) {
     try {
-      if (!auth.currentUser) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         throw new Error('Not signed in');
       }
 
-      const userId = auth.currentUser.uid;
-      const entryRef = doc(db, 'journal_entries', entry.id);
+      const userId = user.id;
       
-      await setDoc(entryRef, {
-        ...entry,
-        userId,
-        updatedAt: Timestamp.fromDate(new Date(entry.updatedAt)),
-        createdAt: Timestamp.fromDate(new Date(entry.createdAt)),
-        source: 'mobile',
-      });
+      // Encrypt title and content
+      const encryptedTitle = await encryptData(entry.title);
+      const encryptedContent = await encryptData(entry.content);
+      
+      // Convert entry to Supabase format
+      const supabaseEntry = {
+        title: encryptedTitle,
+        content: encryptedContent,
+        date: entry.date,
+        tags: entry.tags || [],
+        user_id: userId,
+        source: 'mobile' as const,
+        last_modified: new Date().toISOString(),
+        mood: entry.mood || null,
+      };
 
-      // Mark entry as synced
-      await storage.saveEntry({ ...entry, synced: true });
+      // Always insert new entry (let Supabase generate UUID)
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .insert(supabaseEntry)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      const result = data;
+
+      // Update local entry with the server-generated ID and mark as synced
+      const updatedEntry = { ...entry, id: result.id, synced: true };
+      
+      // Delete the old entry first, then save the new one
+      await storage.deleteEntry(entry.id);
+      await storage.saveEntry(updatedEntry);
+      
       return true;
     } catch (error) {
       console.error('Error syncing entry:', error);
@@ -73,46 +81,18 @@ export const sync = {
 
   async syncAllEntries() {
     try {
-      if (!auth.currentUser) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         throw new Error('Not signed in');
       }
 
-      const userId = auth.currentUser.uid;
+      const userId = user.id;
       const entries = await storage.getAllEntries();
       
-      // Upload local entries
+      // Upload only unsynced local entries to web
       for (const entry of entries) {
         if (!entry.synced) {
           await this.syncEntry(entry);
-        }
-      }
-
-      // Download remote entries
-      const entriesRef = collection(db, 'journal_entries');
-      const q = query(
-        entriesRef,
-        where('userId', '==', userId),
-        where('updatedAt', '>', Timestamp.fromDate(new Date(0)))
-      );
-      const querySnapshot = await getDocs(q);
-
-      const remoteEntries: JournalEntry[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        remoteEntries.push({
-          ...data,
-          id: doc.id,
-          updatedAt: data.updatedAt.toDate().toISOString(),
-          createdAt: data.createdAt.toDate().toISOString(),
-          synced: true,
-        } as JournalEntry);
-      });
-
-      // Merge remote entries with local entries
-      for (const remoteEntry of remoteEntries) {
-        const localEntry = entries.find(e => e.id === remoteEntry.id);
-        if (!localEntry || new Date(localEntry.updatedAt) < new Date(remoteEntry.updatedAt)) {
-          await storage.saveEntry(remoteEntry);
         }
       }
 
@@ -123,8 +103,21 @@ export const sync = {
     }
   },
 
+
+
+
+
   async restoreAuthState() {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        return {
+          uid: session.user.id,
+          email: session.user.email,
+        };
+      }
+
+      // Fallback to AsyncStorage for backward compatibility
       const authUser = await AsyncStorage.getItem('auth_user');
       return authUser ? JSON.parse(authUser) : null;
     } catch (error) {

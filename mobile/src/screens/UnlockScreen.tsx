@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth } from '../services/auth';
 import { storage } from '../services/storage';
 import { router } from 'expo-router';
+import { useLock } from '../contexts/LockContext';
 
 const PIN_LENGTH = 4;
 const SECRET_RESET_COUNT = 6;
@@ -31,6 +32,7 @@ export function UnlockScreen({ onUnlock }: Props) {
   const [deleteCount, setDeleteCount] = useState(0);
   const [lastDeletePress, setLastDeletePress] = useState(0);
   const insets = useSafeAreaInsets();
+  const { unlock } = useLock();
 
   useEffect(() => {
     checkBiometrics();
@@ -80,6 +82,7 @@ export function UnlockScreen({ onUnlock }: Props) {
         const success = await auth.verifyBiometrics();
         if (success) {
           Vibration.vibrate([0, 50, 100]); // Success vibration
+          unlock();
           onUnlock();
         }
       }
@@ -103,6 +106,7 @@ export function UnlockScreen({ onUnlock }: Props) {
           const isValid = await auth.verifyPIN(newPin);
           if (isValid) {
             Vibration.vibrate([0, 50, 100]); // Success vibration
+            unlock();
             onUnlock();
           } else {
             Vibration.vibrate([0, 50, 50, 50]); // Error vibration

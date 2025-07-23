@@ -9,6 +9,9 @@ export interface JournalEntry {
   id: string;
   title: string;
   content: string;
+  date: string;
+  tags: string[];
+  mood?: string;
   createdAt: string;
   updatedAt: string;
   synced?: boolean;

@@ -28,6 +28,14 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const insets = useSafeAreaInsets();
 
+  const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
   useEffect(() => {
     if (entry) {
       setTitle(entry.title);
@@ -57,9 +65,12 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
     setIsSaving(true);
     try {
       const newEntry = {
-        id: entry?.id || Date.now().toString(),
+        id: entry?.id || generateUUID(),
         title: title.trim(),
         content: content.trim(),
+        date: entry?.date || new Date().toISOString().split('T')[0],
+        tags: entry?.tags || [],
+        mood: entry?.mood,
         createdAt: entry?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         synced: false,

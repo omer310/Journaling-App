@@ -1,12 +1,10 @@
-import { Stack, SplashScreen } from 'expo-router';
+import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+import { LockProvider } from '../src/contexts/LockContext';
 
 export default function RootLayout() {
   const [initialRoute, setInitialRoute] = useState<string | null>(null);
@@ -29,9 +27,6 @@ export default function RootLayout() {
         console.error('Error during initialization:', error);
         // Default to setup if there's an error
         setInitialRoute('setup');
-      } finally {
-        // Hide the splash screen once we're done
-        await SplashScreen.hideAsync();
       }
     }
 
@@ -44,20 +39,22 @@ export default function RootLayout() {
   }
 
   return (
-    <SafeAreaProvider>
-      <GestureHandlerRootView style={styles.container}>
-        <View style={styles.container}>
-          <Stack
-            initialRouteName={initialRoute}
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: 'transparent' },
-              animation: 'fade',
-            }}
-          />
-        </View>
-      </GestureHandlerRootView>
-    </SafeAreaProvider>
+    <LockProvider>
+      <SafeAreaProvider>
+        <GestureHandlerRootView style={styles.container}>
+          <View style={styles.container}>
+            <Stack
+              initialRouteName={initialRoute}
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: 'transparent' },
+                animation: 'fade',
+              }}
+            />
+          </View>
+        </GestureHandlerRootView>
+      </SafeAreaProvider>
+    </LockProvider>
   );
 }
 
