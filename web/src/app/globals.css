@@ -1,45 +1,39 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-:root {
-  /* Light theme variables */
-  --background: #ffffff;
-  --foreground: #171717;
-  --primary: #009F6B;
-  --primary-light: #00B377;
-  --primary-dark: #008C5E;
-  --secondary: #64748b;
-  --surface: #ffffff;
-  --surface-hover: #f8fafc;
-  --border: #e2e8f0;
-  --text-primary: #171717;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --editor-bg: #ffffff;
-  --editor-text: #171717;
-  --editor-border: #e2e8f0;
-  --editor-toolbar: #f8fafc;
+@theme {
+  --color-primary: #009F6B;
+  --color-primary-light: #00B377;
+  --color-primary-dark: #008C5E;
+  --color-secondary: #64748b;
+  --color-background: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-text-primary: #171717;
+  --color-text-secondary: #64748b;
+  --color-text-muted: #94a3b8;
+  --color-editor-bg: #ffffff;
+  --color-editor-text: #171717;
+  --color-editor-border: #e2e8f0;
+  --color-editor-toolbar: #f8fafc;
 }
 
-.dark {
-  /* Dark theme variables */
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --primary: #00B377;
-  --primary-light: #00CC88;
-  --primary-dark: #009F6B;
-  --secondary: #94a3b8;
-  --surface: #1a1a1a;
-  --surface-hover: #262626;
-  --border: #404040;
-  --text-primary: #ededed;
-  --text-secondary: #a3a3a3;
-  --text-muted: #737373;
-  --editor-bg: #1a1a1a;
-  --editor-text: #ededed;
-  --editor-border: #404040;
-  --editor-toolbar: #262626;
+@theme dark {
+  --color-background: #0a0a0a;
+  --color-primary: #00B377;
+  --color-primary-light: #00CC88;
+  --color-primary-dark: #009F6B;
+  --color-secondary: #94a3b8;
+  --color-surface: #1a1a1a;
+  --color-surface-hover: #262626;
+  --color-border: #404040;
+  --color-text-primary: #ededed;
+  --color-text-secondary: #a3a3a3;
+  --color-text-muted: #737373;
+  --color-editor-bg: #1a1a1a;
+  --color-editor-text: #ededed;
+  --color-editor-border: #404040;
+  --color-editor-toolbar: #262626;
 }
 
 html {
@@ -48,8 +42,8 @@ html {
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
+  color: var(--color-text-primary);
+  background: var(--color-background);
   /* Ensure smooth theme transitions */
   transition: background-color 0.2s ease, color 0.2s ease;
 }
@@ -61,15 +55,15 @@ html:not(.dark) {
 
 /* Rich text editor styles */
 .editor-container {
-  background: var(--editor-bg);
-  border: 1px solid var(--editor-border);
+  background: var(--color-editor-bg);
+  border: 1px solid var(--color-editor-border);
   border-radius: 0.5rem;
   overflow: hidden;
 }
 
 .editor-toolbar {
-  background: var(--editor-toolbar);
-  border-bottom: 1px solid var(--editor-border);
+  background: var(--color-editor-toolbar);
+  border-bottom: 1px solid var(--color-editor-border);
   padding: 0.5rem;
   display: flex;
   flex-wrap: wrap;
@@ -79,7 +73,7 @@ html:not(.dark) {
 .editor-content {
   min-height: 300px;
   padding: 1rem;
-  color: var(--editor-text);
+  color: var(--color-editor-text);
 }
 
 /* Theme transition - apply to most elements but not body to avoid conflicts */
@@ -92,14 +86,14 @@ html:not(.dark) {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 1px;
-  background: var(--border);
-  border: 1px solid var(--border);
+  background: var(--color-border);
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
   overflow: hidden;
 }
 
 .calendar-day {
-  background: var(--surface);
+  background: var(--color-surface);
   aspect-ratio: 1;
   padding: 0.5rem;
   display: flex;
@@ -109,7 +103,7 @@ html:not(.dark) {
 }
 
 .calendar-day:hover {
-  background: var(--surface-hover);
+  background: var(--color-surface-hover);
 }
 
 .calendar-day.has-entry {
@@ -122,7 +116,7 @@ html:not(.dark) {
   bottom: 0.25rem;
   width: 0.25rem;
   height: 0.25rem;
-  background: var(--primary);
+  background: var(--color-primary);
   border-radius: 50%;
 }
 
@@ -131,10 +125,10 @@ html:not(.dark) {
   display: inline-flex;
   align-items: center;
   padding: 0.25rem 0.75rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 9999px;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font-size: 0.875rem;
   line-height: 1.25rem;
   gap: 0.25rem;
@@ -142,9 +136,9 @@ html:not(.dark) {
 }
 
 .tag:hover {
-  background: var(--surface-hover);
-  border-color: var(--primary);
-  color: var(--primary);
+  background: var(--color-surface-hover);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 /* Search styles */
@@ -152,15 +146,15 @@ html:not(.dark) {
   width: 100%;
   padding: 0.75rem 1rem;
   padding-left: 2.5rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .search-input:focus {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px var(--primary-light);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-light);
 }
 

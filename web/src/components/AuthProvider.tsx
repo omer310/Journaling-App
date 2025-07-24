@@ -18,19 +18,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const initializedRef = React.useRef(false);
 
-  console.log('AuthProvider render: user=', user?.email, 'loading=', loading, 'initialized=', initializedRef.current);
 
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      console.log('AuthProvider: Initial session:', session?.user?.email, 'session:', session);
       
       if (session?.user) {
         setUser(session.user);
         setLoading(false);
         initializedRef.current = true;
-        console.log('AuthProvider: Initial user state set to:', session.user.email);
         
         // Fetch initial entries
         await useStore.getState().fetchEntries();
@@ -41,7 +38,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         setLoading(false);
         initializedRef.current = true;
-        console.log('AuthProvider: Initial user state set to: null');
       }
     };
 
@@ -50,14 +46,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes (only after initialization to avoid race conditions)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('AuthProvider: Auth state change:', event, session?.user?.email, 'session:', session, 'initialized:', initializedRef.current);
         
         // Only handle auth changes after initial session is loaded
         if (initializedRef.current) {
           if (session?.user) {
             setUser(session.user);
             setLoading(false);
-            console.log('AuthProvider: User state updated to:', session.user.email);
             
             // Fetch initial entries
             await useStore.getState().fetchEntries();
@@ -65,7 +59,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Set up real-time subscription
             await setupRealtimeSubscription(session.user.id);
           } else {
-            console.log('AuthProvider: User logged out, clearing data...');
             setUser(null);
             setLoading(false);
             

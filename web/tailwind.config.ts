@@ -9,53 +9,38 @@ const config: Config = {
   darkMode: 'class',
   theme: {
     extend: {
-      colors: {
-        primary: 'var(--primary)',
-        'primary-light': 'var(--primary-light)',
-        'primary-dark': 'var(--primary-dark)',
-        secondary: 'var(--secondary)',
-        background: 'var(--background)',
-        surface: 'var(--surface)',
-        'surface-hover': 'var(--surface-hover)',
-        border: 'var(--border)',
-        text: {
-          primary: 'var(--text-primary)',
-          secondary: 'var(--text-secondary)',
-          muted: 'var(--text-muted)',
-        },
-      },
       typography: (theme: any) => ({
         DEFAULT: {
           css: {
-            color: 'var(--text-primary)',
+            color: theme('colors.text-primary'),
             a: {
-              color: 'var(--primary)',
+              color: theme('colors.primary'),
               '&:hover': {
-                color: 'var(--primary-dark)',
+                color: theme('colors.primary-dark'),
               },
             },
             h1: {
-              color: 'var(--text-primary)',
+              color: theme('colors.text-primary'),
             },
             h2: {
-              color: 'var(--text-primary)',
+              color: theme('colors.text-primary'),
             },
             h3: {
-              color: 'var(--text-primary)',
+              color: theme('colors.text-primary'),
             },
             h4: {
-              color: 'var(--text-primary)',
+              color: theme('colors.text-primary'),
             },
             strong: {
-              color: 'var(--text-primary)',
+              color: theme('colors.text-primary'),
             },
             blockquote: {
-              color: 'var(--text-secondary)',
-              borderLeftColor: 'var(--border)',
+              color: theme('colors.text-secondary'),
+              borderLeftColor: theme('colors.border'),
             },
             code: {
-              color: 'var(--text-primary)',
-              backgroundColor: 'var(--surface-hover)',
+              color: theme('colors.text-primary'),
+              backgroundColor: theme('colors.surface-hover'),
             },
             'code::before': {
               content: '""',
@@ -64,8 +49,8 @@ const config: Config = {
               content: '""',
             },
             pre: {
-              backgroundColor: 'var(--surface)',
-              color: 'var(--text-primary)',
+              backgroundColor: theme('colors.surface'),
+              color: theme('colors.text-primary'),
             },
           },
         },
