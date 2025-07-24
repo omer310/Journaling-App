@@ -1,6 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+
+// Disable static generation for this page since it requires authentication
+// and has heavy client-side interactivity
+export const dynamic = 'force-dynamic';
 import { useRouter } from 'next/navigation';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { Tags } from '@/components/Tags';

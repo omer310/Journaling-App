@@ -1,6 +1,5 @@
 'use client';
 
-import 'regenerator-runtime/runtime';
 import './globals.css';
 import { Inter } from 'next/font/google';
 import { useStore } from '@/store/useStore';

@@ -1,5 +1,8 @@
 'use client';
 
+// Disable static generation for this authenticated page
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar } from '@/components/Calendar';

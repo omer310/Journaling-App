@@ -9,7 +9,19 @@ import TaskItem from '@tiptap/extension-task-item';
 import TextAlign from '@tiptap/extension-text-align';
 import Placeholder from '@tiptap/extension-placeholder';
 import Typography from '@tiptap/extension-typography';
-import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+// Conditionally import speech recognition only on client side to avoid SSR issues
+let SpeechRecognition: any = null;
+let useSpeechRecognition: any = null;
+
+if (typeof window !== 'undefined') {
+  try {
+    const speechModule = require('react-speech-recognition');
+    SpeechRecognition = speechModule.default;
+    useSpeechRecognition = speechModule.useSpeechRecognition;
+  } catch (e) {
+    console.warn('Speech recognition not available:', e);
+  }
+}
 import {
   RiBold,
   RiItalic,
@@ -44,6 +56,21 @@ export function RichTextEditor({
   placeholder = 'Write your thoughts here...',
   autosave = true,
 }: RichTextEditorProps): React.ReactElement | null {
+  // Use speech recognition only if available
+  const speechRecognitionResult = useSpeechRecognition ? useSpeechRecognition({
+    commands: [],
+    transcribing: true,
+    clearTranscriptOnListen: true,
+  }) : {
+    transcript: '',
+    listening: false,
+    resetTranscript: () => {},
+    browserSupportsSpeechRecognition: false,
+    isMicrophoneAvailable: false,
+    finalTranscript: '',
+    interimTranscript: ''
+  };
+
   const {
     transcript,
     listening,
@@ -52,11 +79,7 @@ export function RichTextEditor({
     isMicrophoneAvailable,
     finalTranscript,
     interimTranscript
-  } = useSpeechRecognition({
-    commands: [],
-    transcribing: true,
-    clearTranscriptOnListen: true,
-  });
+  } = speechRecognitionResult;
 
   const editor = useEditor({
     extensions: [
@@ -124,6 +147,11 @@ export function RichTextEditor({
 
     if (!isMicrophoneAvailable) {
       alert('Please allow microphone access to use voice input.');
+      return;
+    }
+
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not available in this environment.');
       return;
     }
 

@@ -1,5 +1,8 @@
 'use client';
 
+// Disable static generation since this page uses auth and redirects
+export const dynamic = 'force-dynamic';
+
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
