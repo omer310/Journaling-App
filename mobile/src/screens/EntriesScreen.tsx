@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { storage, JournalEntry } from '../services/storage';
 import { Swipeable } from 'react-native-gesture-handler';
 import { sync } from '../services/sync';
+import { BottomNavBar } from '../../components/BottomNavBar';
 
 interface Props {
   onEditEntry: (entry: JournalEntry) => void;
@@ -175,31 +176,10 @@ export function EntriesScreen({ onEditEntry, onNewEntry, onOpenSettings }: Props
     ]}>
       <View style={[
         styles.header,
-        { paddingTop: insets.top + 8 },
+        { paddingTop: insets.top + 16 },
         isDarkMode && styles.darkHeader
       ]}>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity 
-            onPress={handleSyncAll} 
-            style={styles.syncAllButton}
-            disabled={isSyncing}
-          >
-            {isSyncing ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.syncAllButtonText}>↑ Sync</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={onOpenSettings} 
-            style={[styles.settingsButton, isDarkMode && styles.darkSettingsButton]}
-          >
-            <Text style={[styles.settingsButtonText, isDarkMode && styles.darkSettingsButtonText]}>⚙</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onNewEntry} style={styles.newButton}>
-            <Text style={styles.newButtonText}>New Entry</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={[styles.title, isDarkMode && styles.darkText]}>My Journal</Text>
       </View>
 
       {entries.length === 0 ? (
@@ -246,7 +226,7 @@ export function EntriesScreen({ onEditEntry, onNewEntry, onOpenSettings }: Props
             </Swipeable>
           )}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: 100 }]}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -257,6 +237,14 @@ export function EntriesScreen({ onEditEntry, onNewEntry, onOpenSettings }: Props
           }
         />
       )}
+
+      <BottomNavBar
+        onSync={handleSyncAll}
+        onNewEntry={onNewEntry}
+        onSettings={onOpenSettings}
+        isSyncing={isSyncing}
+        isDarkMode={isDarkMode}
+      />
     </View>
   );
 }
@@ -270,19 +258,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    marginBottom: 8,
+    alignItems: 'center',
   },
   darkHeader: {
     backgroundColor: '#1a1a1a',
-    borderBottomColor: '#2d2d2d',
   },
   darkText: {
     color: '#fff',
@@ -290,64 +272,9 @@ const styles = StyleSheet.create({
   darkSecondaryText: {
     color: '#a1a1aa',
   },
-  settingsButton: {
-    padding: 8,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    width: 48,
-    height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  darkSettingsButton: {
-    backgroundColor: '#2d2d2d',
-  },
-  settingsButtonText: {
-    fontSize: 26,
-    color: '#1a1a1a',
-  },
-  darkSettingsButtonText: {
-    color: '#fff',
-  },
   darkEntryCard: {
     backgroundColor: '#2d2d2d',
     borderColor: '#404040',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    maxWidth: 340,
-    gap: 16,
-  },
-  syncAllButton: {
-    backgroundColor: '#4f46e5',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    minWidth: 85,
-    justifyContent: 'center',
-  },
-  syncAllButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  newButton: {
-    backgroundColor: '#22c55e',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  newButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 15,
   },
   list: {
     padding: 16,
@@ -458,5 +385,10 @@ const styles = StyleSheet.create({
   },
   swipeableContainer: {
     marginBottom: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
   },
 }); 

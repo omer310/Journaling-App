@@ -4,8 +4,8 @@ import 'regenerator-runtime/runtime';
 import './globals.css';
 import { Inter } from 'next/font/google';
 import { useStore } from '@/store/useStore';
-import { useEffect } from 'react';
-import { RiSunLine, RiMoonLine, RiWifiOffLine } from 'react-icons/ri';
+import { useEffect, useState } from 'react';
+import { RiSunLine, RiMoonLine, RiWifiOffLine, RiSettings3Line } from 'react-icons/ri';
 import Link from 'next/link';
 import { AuthProvider, useAuth } from '@/components/AuthProvider';
 import LogoutButton from '@/components/LogoutButton';
@@ -18,8 +18,10 @@ function RootLayoutContent({
 }: {
   children: React.ReactNode;
 }) {
-  const { currentTheme, setTheme, isOffline, setOfflineStatus } = useStore();
+  const { currentTheme, setTheme, isOffline, setOfflineStatus, cleanupCorruptedEntries } = useStore();
   const { user, loading } = useAuth();
+  const [showSettings, setShowSettings] = useState(false);
+  const [isCleaning, setIsCleaning] = useState(false);
   
   console.log('RootLayoutContent: user=', user?.email, 'loading=', loading);
 
@@ -62,6 +64,24 @@ function RootLayoutContent({
       window.removeEventListener('offline', handleOffline);
     };
   }, [setOfflineStatus]);
+
+  useEffect(() => {
+    // Close settings dropdown when clicking outside
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.settings-dropdown')) {
+        setShowSettings(false);
+      }
+    };
+
+    if (showSettings) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSettings]);
 
   return (
     <>
@@ -126,6 +146,39 @@ function RootLayoutContent({
 
                 {user && (
                   <>
+                    <div className="relative settings-dropdown">
+                      <button
+                        onClick={() => setShowSettings(!showSettings)}
+                        className="p-2 rounded-lg bg-surface text-secondary hover:text-primary"
+                        aria-label="Settings"
+                      >
+                        <RiSettings3Line className="w-5 h-5" />
+                      </button>
+                      
+                      {showSettings && (
+                        <div className="absolute right-0 mt-2 w-48 bg-surface border border-border rounded-lg shadow-lg z-50">
+                          <button
+                            onClick={async () => {
+                              setIsCleaning(true);
+                              try {
+                                await cleanupCorruptedEntries();
+                                alert('Data cleanup completed!');
+                              } catch (error) {
+                                alert('Error during cleanup: ' + error);
+                              } finally {
+                                setIsCleaning(false);
+                                setShowSettings(false);
+                              }
+                            }}
+                            disabled={isCleaning}
+                            className="w-full px-4 py-2 text-left text-sm text-secondary hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50"
+                          >
+                            {isCleaning ? 'Cleaning...' : 'Clean Corrupted Data'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    
                     {console.log('Rendering LogoutButton for user:', user.email)}
                     <LogoutButton />
                   </>
@@ -148,6 +201,48 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  // Read theme from localStorage
+                  const stored = localStorage.getItem('soul-pages-storage');
+                  if (stored) {
+                    const data = JSON.parse(stored);
+                    const theme = data.state?.currentTheme || 'system';
+                    
+                    // Apply theme immediately
+                    const root = document.documentElement;
+                    if (theme === 'dark') {
+                      root.classList.add('dark');
+                    } else if (theme === 'light') {
+                      root.classList.remove('dark');
+                    } else if (theme === 'system') {
+                      // Check system preference
+                      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                      if (systemDark) {
+                        root.classList.add('dark');
+                      } else {
+                        root.classList.remove('dark');
+                      }
+                    }
+                  } else {
+                    // Default to system preference if no stored theme
+                    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    if (systemDark) {
+                      document.documentElement.classList.add('dark');
+                    }
+                  }
+                } catch (e) {
+                  // Silently handle any errors
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       <body suppressHydrationWarning>
         <AuthProvider>
           <RootLayoutContent>{children}</RootLayoutContent>

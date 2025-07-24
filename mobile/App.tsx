@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as Linking from 'expo-linking';
 import { SetupPINScreen } from './src/screens/SetupPINScreen';
 import { UnlockScreen } from './src/screens/UnlockScreen';
 import { JournalScreen } from './src/screens/JournalScreen';
@@ -16,7 +17,36 @@ export default function App() {
 
   useEffect(() => {
     checkPINSetup();
+    setupDeepLinking();
   }, []);
+
+  const setupDeepLinking = () => {
+    // Handle deep links when app is already running
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+    
+    // Handle deep links when app is opened from a link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink({ url });
+      }
+    });
+
+    return () => subscription?.remove();
+  };
+
+  const handleDeepLink = ({ url }: { url: string }) => {
+    // Handle OAuth callback
+    if (url.includes('auth/callback')) {
+      // The session should be established now, so we can check it
+      setTimeout(async () => {
+        try {
+          await auth.restoreAuthState();
+        } catch (error) {
+          console.error('Error checking session after OAuth callback:', error);
+        }
+      }, 1000);
+    }
+  };
 
   const checkPINSetup = async () => {
     try {

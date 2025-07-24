@@ -84,6 +84,7 @@ export function RichTextEditor({
       const html = editor.getHTML();
       onChange(html);
     },
+    immediatelyRender: false,
   });
 
   // Insert transcript into editor when it changes

@@ -58,33 +58,46 @@ export function SocialAuth() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3">
-        <button
-          onClick={handleGoogleSignIn}
-          disabled={loading}
-          className="flex items-center justify-center gap-2 w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <RiGoogleFill className="w-5 h-5" />
-          <span>{loading ? 'Signing in...' : (isRegister ? 'Sign up with Google' : 'Continue with Google')}</span>
-        </button>
-      </div>
-
-      {error && (
-        <div className="text-red-500 text-sm text-center">
-          {error}
-        </div>
-      )}
-
+      {/* Divider */}
       <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300"></div>
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-background text-secondary">
-            or {isRegister ? 'sign up' : 'continue'} with email
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="text-text-muted font-medium">
+            Or continue with
           </span>
         </div>
       </div>
+
+      {/* Google button */}
+      <button
+        onClick={handleGoogleSignIn}
+        disabled={loading}
+        className="flex items-center justify-center gap-3 w-full px-4 py-3.5 bg-white dark:bg-white/10 border border-border/50 rounded-xl text-text-primary hover:bg-surface-hover dark:hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.01] active:scale-[0.99] group shadow-sm"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-5 h-5 flex items-center justify-center">
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+            ) : (
+              <RiGoogleFill className="w-5 h-5 text-[#4285f4]" />
+            )}
+          </div>
+          <span className="font-medium">
+            {loading 
+              ? 'Connecting...' 
+              : isRegister 
+                ? 'Continue with Google' 
+                : 'Sign in with Google'
+            }
+          </span>
+        </div>
+      </button>
+
+      {/* Error message */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl text-sm animate-in slide-in-from-top-2">
+          {error}
+        </div>
+      )}
     </div>
   );
 } 

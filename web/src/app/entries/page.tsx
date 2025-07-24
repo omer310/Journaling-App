@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar } from '@/components/Calendar';
 import { Search } from '@/components/Search';
@@ -16,6 +16,8 @@ import {
   RiBarChartLine,
   RiCheckboxBlankLine,
   RiCheckboxFill,
+  RiRefreshLine,
+  RiDeleteBinLine,
 } from 'react-icons/ri';
 import { exportToPdf, exportToMarkdown, exportToText } from '@/services/export';
 
@@ -46,7 +48,23 @@ export default function EntriesPage() {
   const [selectedMoods, setSelectedMoods] = useState<Mood[]>([]);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [selectedEntries, setSelectedEntries] = useState<string[]>([]);
-  const { entries = [], tags = [], removeEntry, removeTag, searchEntries } = useStore();
+  const [refreshing, setRefreshing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { entries = [], entriesLoading, tags = [], removeEntry, removeMultipleEntries, removeTag, searchEntries, fetchEntries, lastSyncTime } = useStore();
+
+  // Fetch entries when component mounts
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchEntries();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleSearch = async (query: string) => {
     const results = searchEntries(query);
@@ -93,8 +111,41 @@ export default function EntriesPage() {
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this entry?')) {
-      removeEntry(id);
-      setSelectedEntries(selectedEntries.filter((entryId) => entryId !== id));
+      setDeleting(true);
+      try {
+        await removeEntry(id);
+        setSelectedEntries(selectedEntries.filter((entryId) => entryId !== id));
+      } catch (error) {
+        console.error('Error deleting entry:', error);
+        alert('Failed to delete entry. Please try again.');
+      } finally {
+        setDeleting(false);
+      }
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedEntries.length === 0) {
+      alert('No entries selected');
+      return;
+    }
+
+    const confirmMessage = selectedEntries.length === 1 
+      ? 'Are you sure you want to delete this entry?' 
+      : `Are you sure you want to delete ${selectedEntries.length} entries?`;
+
+    if (window.confirm(confirmMessage)) {
+      setDeleting(true);
+      try {
+        // Delete all selected entries in a single operation
+        await removeMultipleEntries(selectedEntries);
+        setSelectedEntries([]);
+      } catch (error) {
+        console.error('Error deleting selected entries:', error);
+        alert('Failed to delete some entries. Please try again.');
+      } finally {
+        setDeleting(false);
+      }
     }
   };
 
@@ -166,6 +217,19 @@ export default function EntriesPage() {
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
               <div className="flex items-center gap-4">
                 <h1 className="text-3xl font-bold text-primary">Journal Entries</h1>
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing || entriesLoading}
+                  className="p-2 rounded-lg bg-surface text-secondary hover:text-primary disabled:opacity-50"
+                  title="Refresh entries"
+                >
+                  <RiRefreshLine className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+                </button>
+                {lastSyncTime && (
+                  <div className="text-xs text-secondary">
+                    Last sync: {new Date(lastSyncTime).toLocaleTimeString()}
+                  </div>
+                )}
                 {viewMode === 'list' && filteredEntries.length > 0 && (
                   <button
                     onClick={toggleAllEntries}
@@ -185,6 +249,19 @@ export default function EntriesPage() {
                 )}
               </div>
               <div className="flex gap-4">
+                {selectedEntries.length > 0 && (
+                  <button
+                    onClick={handleDeleteSelected}
+                    disabled={deleting || entriesLoading}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors duration-200 disabled:opacity-50"
+                    title={`Delete ${selectedEntries.length} selected entries`}
+                  >
+                    <RiDeleteBinLine className={`w-4 h-4 ${deleting ? 'animate-spin' : ''}`} />
+                    <span className="text-sm">
+                      {deleting ? 'Deleting...' : 'Delete Selected'}
+                    </span>
+                  </button>
+                )}
                 <ExportMenu
                   entries={selectedEntries.length > 0
                     ? filteredEntries.filter((entry) => selectedEntries.includes(entry.id))
@@ -257,7 +334,14 @@ export default function EntriesPage() {
               </div>
 
               <div className="lg:col-span-3">
-                {viewMode === 'analytics' ? (
+                {entriesLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-secondary">Loading entries...</p>
+                    </div>
+                  </div>
+                ) : viewMode === 'analytics' ? (
                   <Analytics entries={filteredEntries} />
                 ) : viewMode === 'calendar' ? (
                   <Calendar

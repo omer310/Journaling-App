@@ -66,10 +66,12 @@ interface AppState {
 
   // Entries
   entries: JournalEntry[];
+  entriesLoading: boolean;
   setEntries: (entries: JournalEntry[]) => void;
   addEntry: (entry: Omit<JournalEntry, 'id' | 'lastModified'>) => void;
   updateEntry: (id: string, entry: Partial<JournalEntry>) => void;
   removeEntry: (id: string) => void;
+  removeMultipleEntries: (ids: string[]) => Promise<void>;
   fetchEntries: () => Promise<void>;
   
   // Search
@@ -81,6 +83,13 @@ interface AppState {
   pendingSync: string[];
   addPendingSync: (entryId: string) => void;
   removePendingSync: (entryId: string) => void;
+  
+  // Sync status
+  lastSyncTime: string | null;
+  setLastSyncTime: (time: string) => void;
+  
+  // Data cleanup
+  cleanupCorruptedEntries: () => Promise<void>;
 }
 
 export const useStore = create<AppState>()(
@@ -125,12 +134,15 @@ export const useStore = create<AppState>()(
 
       // Entries
       entries: [],
+      entriesLoading: false,
       setEntries: (entries) => set({ entries }),
       fetchEntries: async () => {
         try {
+          set({ entriesLoading: true });
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) {
             console.log('No user authenticated, skipping fetch');
+            set({ entriesLoading: false });
             return;
           }
 
@@ -146,18 +158,40 @@ export const useStore = create<AppState>()(
           }
 
           const decryptedEntries: JournalEntry[] = [];
+          const { tags: existingTags } = get();
+          
           for (const entry of entries) {
             try {
               // Decrypt the title and content if they're encrypted
               const title = isEncrypted(entry.title) ? await decryptData(entry.title) : entry.title;
               const content = isEncrypted(entry.content) ? await decryptData(entry.content) : entry.content;
 
+              // Handle missing tag definitions for mobile entries
+              const entryTags = Array.isArray(entry.tags) ? entry.tags : [];
+              const missingTagIds = entryTags.filter((tagId: string) => 
+                !existingTags.find(tag => tag.id === tagId)
+              );
+
+              // Create missing tag definitions for mobile entries
+              if (missingTagIds.length > 0 && entry.source === 'mobile') {
+                const newTags = missingTagIds.map((tagId: string) => ({
+                  id: tagId,
+                  name: `Mobile Tag ${missingTagIds.indexOf(tagId) + 1}`, // More user-friendly name
+                  color: `hsl(${Math.random() * 360}, 70%, 50%)`,
+                }));
+                
+                // Add new tags to the store
+                set((state) => ({
+                  tags: [...state.tags, ...newTags]
+                }));
+              }
+
               decryptedEntries.push({
                 id: entry.id,
                 title: title || '',
                 content: content || '',
                 date: entry.date,
-                tags: entry.tags || [],
+                tags: entryTags,
                 lastModified: entry.last_modified,
                 userId: entry.user_id,
                 source: entry.source,
@@ -165,14 +199,25 @@ export const useStore = create<AppState>()(
               });
             } catch (error) {
               console.error('Error decrypting entry:', error);
-              // Skip this entry if decryption fails
-              continue;
+              // Add the entry with placeholder content if decryption fails
+              decryptedEntries.push({
+                id: entry.id,
+                title: '[Encrypted Entry]',
+                content: 'This entry could not be decrypted. It may have been created with a different encryption method.',
+                date: entry.date,
+                tags: Array.isArray(entry.tags) ? entry.tags : [],
+                lastModified: entry.last_modified,
+                userId: entry.user_id,
+                source: entry.source,
+                mood: entry.mood,
+              });
             }
           }
 
-          set({ entries: decryptedEntries });
+          set({ entries: decryptedEntries, entriesLoading: false, lastSyncTime: new Date().toISOString() });
         } catch (error) {
           console.error('Error in fetchEntries:', error);
+          set({ entriesLoading: false });
         }
       },
       addEntry: async (entry) => {
@@ -281,6 +326,32 @@ export const useStore = create<AppState>()(
           throw error;
         }
       },
+      removeMultipleEntries: async (ids) => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            throw new Error('User not authenticated');
+          }
+
+          // Delete multiple entries in a single query
+          const { error } = await supabase
+            .from('journal_entries')
+            .delete()
+            .in('id', ids)
+            .eq('user_id', user.id);
+
+          if (error) {
+            console.error('Supabase error:', error);
+            throw error;
+          }
+
+          // Refresh entries after deleting
+          await get().fetchEntries();
+        } catch (error) {
+          console.error('Error deleting multiple entries:', error);
+          throw error;
+        }
+      },
 
       // Search
       searchEntries: (query) => {
@@ -305,6 +376,65 @@ export const useStore = create<AppState>()(
         set((state) => ({
           pendingSync: state.pendingSync.filter((id) => id !== entryId),
         })),
+      
+      // Sync status
+      lastSyncTime: null,
+      setLastSyncTime: (time) => set({ lastSyncTime: time }),
+      
+      // Data cleanup
+      cleanupCorruptedEntries: async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            throw new Error('User not authenticated');
+          }
+
+          // Get all entries for the user
+          const { data: entries, error } = await supabase
+            .from('journal_entries')
+            .select('*')
+            .eq('user_id', user.id);
+
+          if (error) {
+            console.error('Error fetching entries for cleanup:', error);
+            return;
+          }
+
+          let cleanedCount = 0;
+          for (const entry of entries || []) {
+            try {
+              // Try to decrypt the entry to see if it's corrupted
+              if (entry.title) {
+                await decryptData(entry.title);
+              }
+              if (entry.content) {
+                await decryptData(entry.content);
+              }
+            } catch (error) {
+              console.log('Found corrupted entry:', entry.id);
+              // Delete the corrupted entry
+              const { error: deleteError } = await supabase
+                .from('journal_entries')
+                .delete()
+                .eq('id', entry.id)
+                .eq('user_id', user.id);
+
+              if (deleteError) {
+                console.error('Error deleting corrupted entry:', deleteError);
+              } else {
+                cleanedCount++;
+              }
+            }
+          }
+
+          console.log(`Cleaned up ${cleanedCount} corrupted entries`);
+          
+          // Refresh entries after cleanup
+          await get().fetchEntries();
+        } catch (error) {
+          console.error('Error cleaning up corrupted entries:', error);
+        }
+      },
     }),
     {
       name: 'soul-pages-storage',
@@ -319,48 +449,49 @@ export const useStore = create<AppState>()(
   )
 );
 
-// Set up Supabase sync
+// Set up Supabase sync - moved to AuthProvider to avoid race conditions
 let currentChannel: any = null;
 
-supabase.auth.onAuthStateChange(async (event, session) => {
-  console.log('Auth state change:', event, session?.user?.email);
-  
-  if (session?.user) {
-    // Fetch initial entries
-    await useStore.getState().fetchEntries();
-
-    // Set up real-time subscription
-    if (currentChannel) {
-      supabase.removeChannel(currentChannel);
-    }
-
-    currentChannel = supabase
-      .channel('journal_entries')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'journal_entries',
-          filter: `user_id=eq.${session.user.id}`,
-        },
-        async (payload) => {
-          console.log('Real-time update:', payload);
-          
-          // Refetch all entries to ensure consistency
-          await useStore.getState().fetchEntries();
-        }
-      )
-      .subscribe();
-  } else {
-    console.log('User logged out, clearing data...');
-    // Clear entries when user logs out
-    useStore.getState().setEntries([]);
-    
-    // Clean up channel
-    if (currentChannel) {
-      supabase.removeChannel(currentChannel);
-      currentChannel = null;
-    }
+// Function to set up real-time subscription
+export const setupRealtimeSubscription = async (userId: string) => {
+  if (currentChannel) {
+    supabase.removeChannel(currentChannel);
   }
-}); 
+
+  currentChannel = supabase
+    .channel('journal_entries')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'journal_entries',
+        filter: `user_id=eq.${userId}`,
+      },
+      async (payload) => {
+        console.log('Real-time update:', payload);
+        
+        // Add a small delay to ensure the database has been updated
+        setTimeout(async () => {
+          try {
+            await useStore.getState().fetchEntries();
+            // Update sync time
+            useStore.getState().setLastSyncTime(new Date().toISOString());
+          } catch (error) {
+            console.error('Error fetching entries after real-time update:', error);
+          }
+        }, 500);
+      }
+    )
+    .subscribe((status) => {
+      console.log('Real-time subscription status:', status);
+    });
+};
+
+// Function to cleanup real-time subscription
+export const cleanupRealtimeSubscription = () => {
+  if (currentChannel) {
+    supabase.removeChannel(currentChannel);
+    currentChannel = null;
+  }
+}; 

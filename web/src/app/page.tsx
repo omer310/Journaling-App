@@ -8,13 +8,23 @@ export default function Home() {
   const router = useRouter();
   const { user, loading } = useAuth();
 
+  console.log('Home page: user=', user?.email, 'loading=', loading);
+
   useEffect(() => {
+    console.log('Home page useEffect: loading=', loading, 'user=', user?.email);
     if (!loading) {
-      if (user) {
-        router.push('/journal');
-      } else {
-        router.push('/login');
-      }
+      // Add a small delay to ensure auth state is properly settled
+      const timer = setTimeout(() => {
+        if (user) {
+          console.log('Home page: Redirecting to /journal');
+          router.push('/journal');
+        } else {
+          console.log('Home page: Redirecting to /login');
+          router.push('/login');
+        }
+      }, 100);
+
+      return () => clearTimeout(timer);
     }
   }, [user, loading, router]);
 

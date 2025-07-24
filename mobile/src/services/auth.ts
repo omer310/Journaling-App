@@ -1,6 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { sync } from './sync';
+import { supabase } from '../config/supabase';
 
 const PIN_KEY = 'journal_pin';
 const BIOMETRICS_KEY = 'journal_biometrics_enabled';
@@ -148,24 +150,93 @@ export const auth = {
     }
   },
 
+  async signInWithGoogle(): Promise<{ user: any; session: any } | null> {
+    try {
+      if (!process.env.EXPO_PUBLIC_SUPABASE_URL) {
+        throw new Error('Supabase URL not configured. Please check your environment variables.');
+      }
+      
+      const result = await sync.signInWithGoogle();
+      return result;
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
+      return null;
+    }
+  },
+
   async enableBiometrics() {
     try {
-      const compatible = await SecureStore.isAvailableAsync();
-      if (compatible) {
-        await SecureStore.setItemAsync(BIOMETRICS_KEY, 'enabled');
-        return { success: true, biometryType: 'Biometrics' };
+      // Check if device supports biometric authentication
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+      if (!compatible) {
+        return { success: false, error: 'Biometric hardware not available' };
       }
-      return { success: false, error: 'Biometrics not available' };
+
+      // Check if biometrics are enrolled
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      if (!enrolled) {
+        return { success: false, error: 'No biometrics enrolled on device' };
+      }
+
+      // Test biometric authentication
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Enable biometric authentication',
+        fallbackLabel: 'Use PIN instead',
+        cancelLabel: 'Cancel',
+      });
+
+      if (result.success) {
+        await SecureStore.setItemAsync(BIOMETRICS_KEY, 'enabled');
+        
+        // Get supported biometry types for user feedback
+        const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
+        let biometryType = 'Biometrics';
+        
+        // Prioritize fingerprint detection first (more common)
+        if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+          biometryType = 'Fingerprint';
+        } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+          biometryType = 'Face ID';
+        } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.IRIS)) {
+          biometryType = 'Iris Scan';
+        }
+          
+        return { success: true, biometryType };
+      } else {
+        return { success: false, error: 'Biometric authentication failed' };
+      }
     } catch (error) {
       console.error('Error enabling biometrics:', error);
-      return { success: false, error };
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   },
 
   async verifyBiometrics() {
     try {
+      // First check if biometrics are enabled in our app
       const enabled = await SecureStore.getItemAsync(BIOMETRICS_KEY);
-      return enabled === 'enabled';
+      if (enabled !== 'enabled') {
+        return false;
+      }
+
+      // Check if device still supports biometrics
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      
+      if (!compatible || !enrolled) {
+        // Disable biometrics if hardware/enrollment is no longer available
+        await this.disableBiometrics();
+        return false;
+      }
+
+      // Perform biometric authentication
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Unlock your journal',
+        fallbackLabel: 'Use PIN instead',
+        cancelLabel: 'Cancel',
+      });
+
+      return result.success;
     } catch (error) {
       console.error('Error verifying biometrics:', error);
       return false;
@@ -175,8 +246,23 @@ export const auth = {
   async isBiometricsEnabled() {
     try {
       const enabled = await SecureStore.getItemAsync(BIOMETRICS_KEY);
-      return enabled === 'enabled';
+      if (enabled !== 'enabled') {
+        return false;
+      }
+
+      // Also verify that biometrics are still available on the device
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      
+      if (!compatible || !enrolled) {
+        // Auto-disable if no longer available
+        await this.disableBiometrics();
+        return false;
+      }
+      
+      return true;
     } catch (error) {
+      console.error('Error checking biometrics status:', error);
       return false;
     }
   },
@@ -188,6 +274,161 @@ export const auth = {
     } catch (error) {
       console.error('Error disabling biometrics:', error);
       return false;
+    }
+  },
+
+  async getBiometricCapabilities() {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
+      
+      // Debug logging to see what's being detected
+      console.log('Biometric detection:', {
+        hasHardware,
+        isEnrolled,
+        supportedTypes: supportedTypes.map(type => {
+          switch(type) {
+            case LocalAuthentication.AuthenticationType.FINGERPRINT:
+              return 'FINGERPRINT';
+            case LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION:
+              return 'FACIAL_RECOGNITION';
+            case LocalAuthentication.AuthenticationType.IRIS:
+              return 'IRIS';
+            default:
+              return 'UNKNOWN';
+          }
+        })
+      });
+      
+      let biometryType = 'Biometrics';
+      
+      // Prioritize fingerprint detection first (more common)
+      if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+        biometryType = 'Fingerprint';
+      } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+        biometryType = 'Face ID';
+      } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.IRIS)) {
+        biometryType = 'Iris Scan';
+      }
+
+      return {
+        hasHardware,
+        isEnrolled,
+        biometryType,
+        available: hasHardware && isEnrolled
+      };
+    } catch (error) {
+      console.error('Error checking biometric capabilities:', error);
+      return {
+        hasHardware: false,
+        isEnrolled: false,
+        biometryType: 'Biometrics',
+        available: false
+      };
+    }
+  },
+
+  async restoreAuthState() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        // Update AsyncStorage with current session data
+        await AsyncStorage.setItem('auth_user', JSON.stringify({
+          uid: session.user.id,
+          email: session.user.email,
+        }));
+        return {
+          uid: session.user.id,
+          email: session.user.email,
+        };
+      }
+
+      // If no active session, clear any stale data and return null
+      await AsyncStorage.removeItem('auth_user');
+      return null;
+    } catch (error) {
+      console.error('Error restoring auth state:', error);
+      // Clear stale data on error
+      try {
+        await AsyncStorage.removeItem('auth_user');
+      } catch (clearError) {
+        console.error('Error clearing auth data:', clearError);
+      }
+      return null;
+    }
+  },
+
+  async signOut() {
+    try {
+      // Check if there's an active session first
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          throw error;
+        }
+      }
+      
+      // Clear stored credentials regardless of session state
+      await SecureStore.deleteItemAsync(WEB_CREDENTIALS_KEY);
+      
+      // Clear AsyncStorage auth data
+      await AsyncStorage.removeItem('auth_user');
+      
+      return true;
+    } catch (error) {
+      console.error('Error signing out:', error);
+      // Even if there's an error, clear local data
+      try {
+        await SecureStore.deleteItemAsync(WEB_CREDENTIALS_KEY);
+        await AsyncStorage.removeItem('auth_user');
+      } catch (clearError) {
+        console.error('Error clearing local data:', clearError);
+      }
+      return false;
+    }
+  },
+
+  async forceRefreshAuthState() {
+    try {
+      // Force refresh the session
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error) {
+        // If refresh fails, clear all auth data
+        await this.clearAllAuthData();
+        return null;
+      }
+      
+      if (data.session?.user) {
+        // Update AsyncStorage with fresh session data
+        await AsyncStorage.setItem('auth_user', JSON.stringify({
+          uid: data.session.user.id,
+          email: data.session.user.email,
+        }));
+        return {
+          uid: data.session.user.id,
+          email: data.session.user.email,
+        };
+      }
+      
+      // No valid session, clear data
+      await this.clearAllAuthData();
+      return null;
+    } catch (error) {
+      console.error('Error refreshing auth state:', error);
+      await this.clearAllAuthData();
+      return null;
+    }
+  },
+
+  async clearAllAuthData() {
+    try {
+      await SecureStore.deleteItemAsync(WEB_CREDENTIALS_KEY);
+      await AsyncStorage.removeItem('auth_user');
+    } catch (error) {
+      console.error('Error clearing auth data:', error);
     }
   },
 }; 

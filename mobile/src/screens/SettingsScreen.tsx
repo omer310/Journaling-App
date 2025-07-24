@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth } from '../services/auth';
 import { storage, Theme } from '../services/storage';
 import { Ionicons } from '@expo/vector-icons';
+import { GoogleSignIn } from '../../components/GoogleSignIn';
 
 interface Props {
   onChangePIN: () => void;
@@ -22,12 +23,20 @@ interface Props {
 
 export function SettingsScreen({ onChangePIN }: Props) {
   const [hasBiometrics, setHasBiometrics] = useState(false);
+  const [biometricCapabilities, setBiometricCapabilities] = useState({
+    available: false,
+    biometryType: 'Biometrics',
+    hasHardware: false,
+    isEnrolled: false
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [hasCredentials, setHasCredentials] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -40,14 +49,21 @@ export function SettingsScreen({ onChangePIN }: Props) {
 
   const checkSettings = async () => {
     try {
-      const [biometricsEnabled, webCredentials] = await Promise.all([
+      const [biometricsEnabled, webCredentials, capabilities, authState] = await Promise.all([
         auth.isBiometricsEnabled(),
         auth.getWebCredentials(),
+        auth.getBiometricCapabilities(),
+        auth.forceRefreshAuthState(), // Use force refresh instead
       ]);
       setHasBiometrics(biometricsEnabled);
+      setBiometricCapabilities(capabilities);
       setHasCredentials(!!webCredentials);
+      setIsSignedIn(!!authState);
       if (webCredentials) {
         setEmail(webCredentials.email);
+      }
+      if (authState) {
+        setUserEmail(authState.email || '');
       }
       setIsLoading(false);
     } catch (error) {
@@ -71,14 +87,24 @@ export function SettingsScreen({ onChangePIN }: Props) {
       if (hasBiometrics) {
         await auth.disableBiometrics();
         setHasBiometrics(false);
-        Alert.alert('Success', 'Biometric authentication disabled');
+        Alert.alert('Success', `${biometricCapabilities.biometryType} authentication disabled`);
       } else {
+        // Check capabilities first
+        if (!biometricCapabilities.available) {
+          if (!biometricCapabilities.hasHardware) {
+            Alert.alert('Not Available', 'This device does not support biometric authentication');
+          } else if (!biometricCapabilities.isEnrolled) {
+            Alert.alert('Setup Required', `Please set up ${biometricCapabilities.biometryType} in your device settings first`);
+          }
+          return;
+        }
+
         const result = await auth.enableBiometrics();
         if (result.success) {
           setHasBiometrics(true);
-          Alert.alert('Success', 'Biometric authentication enabled');
+          Alert.alert('Success', `${result.biometryType} authentication enabled`);
         } else {
-          Alert.alert('Error', 'Failed to enable biometric authentication');
+          Alert.alert('Error', result.error || 'Failed to enable biometric authentication');
         }
       }
     } catch (error) {
@@ -105,6 +131,38 @@ export function SettingsScreen({ onChangePIN }: Props) {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSignOut = async () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out? You will need to sign in again to sync your data.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const success = await auth.signOut();
+              if (success) {
+                setIsSignedIn(false);
+                setUserEmail('');
+                setHasCredentials(false);
+                setEmail('');
+                setPassword('');
+                Alert.alert('Success', 'Signed out successfully');
+              } else {
+                Alert.alert('Error', 'Failed to sign out');
+              }
+            } catch (error) {
+              console.error('Error signing out:', error);
+              Alert.alert('Error', 'Failed to sign out');
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (isLoading) {
@@ -153,14 +211,23 @@ export function SettingsScreen({ onChangePIN }: Props) {
           <View style={[styles.settingItem, styles.noBorder]}>
             <View style={styles.settingContent}>
               <Ionicons 
-                name="finger-print-outline" 
+                name={
+                  biometricCapabilities.biometryType === 'Face ID' ? 'scan-outline' :
+                  biometricCapabilities.biometryType === 'Iris Scan' ? 'eye-outline' :
+                  'finger-print-outline'
+                } 
                 size={24} 
                 color={isDarkMode ? '#fff' : '#1a1a1a'} 
               />
               <View style={styles.settingTextContainer}>
-                <Text style={[styles.settingTitle, isDarkMode && styles.darkText]}>Biometric Authentication</Text>
+                <Text style={[styles.settingTitle, isDarkMode && styles.darkText]}>{biometricCapabilities.biometryType}</Text>
                 <Text style={[styles.settingDescription, isDarkMode && styles.darkSecondaryText]}>
-                  Use fingerprint or face recognition
+                  {biometricCapabilities.available 
+                    ? `Use ${biometricCapabilities.biometryType.toLowerCase()} to unlock`
+                    : !biometricCapabilities.hasHardware 
+                      ? 'Not available on this device'
+                      : 'Please set up in device settings'
+                  }
                 </Text>
               </View>
             </View>
@@ -170,6 +237,7 @@ export function SettingsScreen({ onChangePIN }: Props) {
               trackColor={{ false: '#e2e8f0', true: '#4f46e5' }}
               thumbColor={hasBiometrics ? '#fff' : '#fff'}
               ios_backgroundColor="#e2e8f0"
+              disabled={!biometricCapabilities.available}
             />
           </View>
         </View>
@@ -269,16 +337,109 @@ export function SettingsScreen({ onChangePIN }: Props) {
                 <Text style={styles.syncStatus}>Web sync is enabled</Text>
               </View>
             )}
+            
+            <View style={styles.dividerContainer}>
+              <View style={styles.divider} />
+              <Text style={[styles.dividerText, isDarkMode && styles.darkSecondaryText]}>OR</Text>
+              <View style={styles.divider} />
+            </View>
+            
+            <GoogleSignIn
+              onSuccess={async (userData) => {
+                try {
+                  // The user data should already be available from the sign-in
+                  if (userData && userData.user) {
+                    setIsSignedIn(true);
+                    setUserEmail(userData.user.email || '');
+                    setHasCredentials(true);
+                    Alert.alert('Success', 'Successfully signed in with Google!');
+                  } else {
+                    // Fallback: try to get auth state
+                    const authState = await auth.restoreAuthState();
+                    if (authState) {
+                      setIsSignedIn(true);
+                      setUserEmail(authState.email || '');
+                      setHasCredentials(true);
+                      Alert.alert('Success', 'Successfully signed in with Google!');
+                    } else {
+                      Alert.alert('Error', 'Failed to get user information after sign-in');
+                    }
+                  }
+                } catch (error) {
+                  console.error('Error handling Google sign-in success:', error);
+                  Alert.alert('Error', 'Failed to get user information after sign-in');
+                }
+              }}
+              onError={(error) => {
+                Alert.alert('Error', `Failed to sign in with Google: ${error}`);
+              }}
+            />
           </View>
         </View>
       </View>
+
+      {isSignedIn && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>Account</Text>
+          <View style={[styles.card, isDarkMode && styles.darkCard]}>
+            <View style={[styles.settingItem, styles.noBorder]}>
+              <View style={styles.settingContent}>
+                <Ionicons 
+                  name="person-outline" 
+                  size={24} 
+                  color={isDarkMode ? '#fff' : '#1a1a1a'} 
+                />
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, isDarkMode && styles.darkText]}>Signed in as</Text>
+                  <Text style={[styles.settingDescription, isDarkMode && styles.darkSecondaryText]}>
+                    {userEmail}
+                  </Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.accountButtonsContainer}>
+              <TouchableOpacity
+                style={[styles.refreshButton, isDarkMode && styles.darkRefreshButton]}
+                onPress={async () => {
+                  try {
+                    const authState = await auth.forceRefreshAuthState();
+                    if (authState) {
+                      setIsSignedIn(true);
+                      setUserEmail(authState.email || '');
+                      Alert.alert('Success', 'Authentication state refreshed');
+                    } else {
+                      setIsSignedIn(false);
+                      setUserEmail('');
+                      Alert.alert('Info', 'No active session found');
+                    }
+                  } catch (error) {
+                    console.error('Error refreshing auth state:', error);
+                    Alert.alert('Error', 'Failed to refresh authentication state');
+                  }
+                }}
+              >
+                <Ionicons name="refresh-outline" size={20} color="#3b82f6" />
+                <Text style={styles.refreshButtonText}>Refresh</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.signOutButton, isDarkMode && styles.darkSignOutButton]}
+                onPress={handleSignOut}
+              >
+                <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+                <Text style={styles.signOutButtonText}>Sign Out</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
 
       <View style={[styles.section, styles.lastSection]}>
         <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>About</Text>
         <View style={[styles.card, isDarkMode && styles.darkCard]}>
           <View style={[styles.settingItem, styles.noBorder]}>
             <Text style={[styles.settingTitle, isDarkMode && styles.darkText]}>Version</Text>
-            <Text style={[styles.versionText, isDarkMode && styles.darkSecondaryText]}>1.0.0</Text>
+            <Text style={[styles.versionText, isDarkMode && styles.darkSecondaryText]}>1.1.0</Text>
           </View>
         </View>
       </View>
@@ -435,5 +596,70 @@ const styles = StyleSheet.create({
     color: '#64748b',
     textAlign: 'center',
     marginTop: 32,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e2e8f0',
+  },
+  dividerText: {
+    fontSize: 12,
+    color: '#64748b',
+    marginHorizontal: 16,
+    fontWeight: '500',
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 12,
+    padding: 16,
+    margin: 16,
+    marginTop: 0,
+  },
+  darkSignOutButton: {
+    backgroundColor: '#450a0a',
+    borderColor: '#7f1d1d',
+  },
+  signOutButtonText: {
+    color: '#ef4444',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  accountButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    margin: 16,
+    marginTop: 0,
+  },
+  refreshButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 12,
+    padding: 16,
+  },
+  darkRefreshButton: {
+    backgroundColor: '#1e3a8a',
+    borderColor: '#3b82f6',
+  },
+  refreshButtonText: {
+    color: '#3b82f6',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 }); 

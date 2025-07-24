@@ -65,14 +65,26 @@ export async function decryptData(encryptedData: string): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const key = await generateKey(user.id);
-  const decoder = new TextDecoder();
+  // Check if data is actually encrypted
+  if (!isEncrypted(encryptedData)) {
+    return encryptedData;
+  }
 
-  const combined = new Uint8Array(str2ab(atob(encryptedData)));
-  const iv = combined.slice(0, 12);
-  const data = combined.slice(12);
-
+  // First try web encryption (AES-GCM)
   try {
+    const key = await generateKey(user.id);
+    const decoder = new TextDecoder();
+
+    const combined = new Uint8Array(str2ab(atob(encryptedData)));
+    
+    // Check if data is too small for AES-GCM (needs at least 12 bytes for IV)
+    if (combined.length < 12) {
+      throw new Error('Data too small for AES-GCM');
+    }
+    
+    const iv = combined.slice(0, 12);
+    const data = combined.slice(12);
+
     const decryptedData = await window.crypto.subtle.decrypt(
       {
         name: 'AES-GCM',
@@ -84,9 +96,38 @@ export async function decryptData(encryptedData: string): Promise<string> {
 
     return decoder.decode(decryptedData);
   } catch (error) {
-    console.error('Failed to decrypt data:', error);
-    throw new Error('Failed to decrypt data');
+    // If web encryption fails, try mobile encryption (simple XOR)
+    try {
+      return decryptMobileData(encryptedData, user.id);
+    } catch (mobileError) {
+      console.error('Failed to decrypt data with both methods:', { web: error, mobile: mobileError });
+      throw new Error('Failed to decrypt data');
+    }
   }
+}
+
+// Mobile encryption compatibility
+function generateMobileKey(userId: string): string {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    const char = userId.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(16).padStart(8, '0');
+}
+
+function decryptMobileData(encryptedText: string, userId: string): string {
+  const key = generateMobileKey(userId);
+  const decoded = atob(encryptedText);
+  let result = '';
+  for (let i = 0; i < decoded.length; i++) {
+    const charCode = decoded.charCodeAt(i);
+    const keyChar = key.charCodeAt(i % key.length);
+    const decryptedChar = charCode ^ keyChar;
+    result += String.fromCharCode(decryptedChar);
+  }
+  return result;
 }
 
 export function isEncrypted(data: string): boolean {

@@ -31,6 +31,7 @@ export function UnlockScreen({ onUnlock }: Props) {
   const [email, setEmail] = useState('');
   const [deleteCount, setDeleteCount] = useState(0);
   const [lastDeletePress, setLastDeletePress] = useState(0);
+  const [biometricsAvailable, setBiometricsAvailable] = useState(false);
   const insets = useSafeAreaInsets();
   const { unlock } = useLock();
 
@@ -78,6 +79,7 @@ export function UnlockScreen({ onUnlock }: Props) {
   const checkBiometrics = async () => {
     try {
       const isEnabled = await auth.isBiometricsEnabled();
+      setBiometricsAvailable(isEnabled);
       if (isEnabled) {
         const success = await auth.verifyBiometrics();
         if (success) {
@@ -88,6 +90,18 @@ export function UnlockScreen({ onUnlock }: Props) {
       }
     } catch (error) {
       console.error('Error checking biometrics:', error);
+      setBiometricsAvailable(false);
+    }
+  };
+
+  const handleBiometricRetry = async () => {
+    if (biometricsAvailable) {
+      const success = await auth.verifyBiometrics();
+      if (success) {
+        Vibration.vibrate([0, 50, 100]); // Success vibration
+        unlock();
+        onUnlock();
+      }
     }
   };
 
@@ -227,15 +241,27 @@ export function UnlockScreen({ onUnlock }: Props) {
 
         <View style={styles.keypad}>
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => renderNumber(num))}
-          <TouchableOpacity
-            style={styles.keypadButton}
-            onPress={handleForgotPIN}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.forgotPIN, isDarkMode && styles.darkSecondaryText]}>
-              Forgot?
-            </Text>
-          </TouchableOpacity>
+          {biometricsAvailable ? (
+            <TouchableOpacity
+              style={styles.keypadButton}
+              onPress={handleBiometricRetry}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.biometricButton, isDarkMode && styles.darkSecondaryText]}>
+                👤
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.keypadButton}
+              onPress={handleForgotPIN}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.forgotPIN, isDarkMode && styles.darkSecondaryText]}>
+                Forgot?
+              </Text>
+            </TouchableOpacity>
+          )}
           {renderNumber(0)}
           <TouchableOpacity
             style={styles.keypadButton}
@@ -387,6 +413,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textDecorationLine: 'underline',
+  },
+  biometricButton: {
+    fontSize: 24,
+    color: '#666',
   },
   disabledText: {
     opacity: 0.5,
