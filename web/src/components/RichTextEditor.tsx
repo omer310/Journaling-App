@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect } from 'react';
-import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
 import TaskList from '@tiptap/extension-task-list';
@@ -308,7 +309,6 @@ export function RichTextEditor({
       {editor && (
         <BubbleMenu
           editor={editor}
-          tippyOptions={{ duration: 100 }}
           className="bg-surface border border-border rounded-lg shadow-lg flex overflow-hidden"
         >
           <button
