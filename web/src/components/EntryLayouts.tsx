@@ -17,12 +17,13 @@ interface Tag {
 }
 
 interface EntryLayoutProps {
-  entries: Entry[];
-  tags: Tag[];
+  entries: any[];
+  tags: any[];
   selectedEntries: string[];
   onSelect: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onHover?: (id: string) => void;
 }
 
 // Helper function to safely get tags array
@@ -41,7 +42,7 @@ function getTagsArray(tags: any): string[] {
   return [];
 }
 
-export function ListLayout({ entries = [], tags = [], selectedEntries = [], onSelect, onEdit, onDelete }: EntryLayoutProps) {
+export function ListLayout({ entries, tags, selectedEntries, onSelect, onEdit, onDelete, onHover }: EntryLayoutProps) {
   // Add null checks
   if (!entries || !Array.isArray(entries)) {
     return (
@@ -70,6 +71,7 @@ export function ListLayout({ entries = [], tags = [], selectedEntries = [], onSe
             className={`bg-surface rounded-xl shadow-lg p-6 transition-colors duration-200 ${
               selectedEntries.includes(entry.id) ? 'ring-2 ring-[#00ff9d]' : ''
             }`}
+            onMouseEnter={() => onHover?.(entry.id)}
           >
             <div className="flex justify-between items-start">
               <div className="flex gap-4">

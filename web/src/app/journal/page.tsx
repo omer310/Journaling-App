@@ -55,11 +55,17 @@ export default function JournalPage() {
         mood: selectedMood,
       });
 
-      router.push('/entries');
+      // Pre-navigate to entries page to trigger prefetch
+      router.prefetch('/entries');
+      
+      // Small delay to ensure store is updated
+      setTimeout(() => {
+        router.push('/entries');
+      }, 100);
+
     } catch (error: any) {
       console.error('Failed to save entry:', error);
       setError(error.message || 'Failed to save entry. Please try again.');
-    } finally {
       setSaving(false);
     }
   };
@@ -122,22 +128,26 @@ export default function JournalPage() {
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">How are you feeling?</label>
                 <div className="flex gap-4">
-                  {(['happy', 'neutral', 'sad'] as const).map((mood) => (
-                    <label key={mood} className="flex items-center gap-2 cursor-pointer">
+                  {([
+                    { emoji: '🥰', value: 'happy' },
+                    { emoji: '😶', value: 'neutral' },
+                    { emoji: '😢', value: 'sad' }
+                  ] as const).map(({ emoji, value }) => (
+                    <label key={value} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="radio"
                         name="mood"
-                        value={mood}
-                        checked={selectedMood === mood}
-                        onChange={() => setSelectedMood(mood)}
+                        value={value}
+                        checked={selectedMood === value}
+                        onChange={() => setSelectedMood(value)}
                         className="sr-only"
                       />
                       <div className={`px-4 py-2 rounded-full border-2 transition-colors ${
-                        selectedMood === mood
+                        selectedMood === value
                           ? 'border-primary bg-primary/10 text-primary'
                           : 'border-border text-muted-foreground hover:border-primary/50'
                       }`}>
-                        {mood.charAt(0).toUpperCase() + mood.slice(1)}
+                        {emoji}
                       </div>
                     </label>
                   ))}

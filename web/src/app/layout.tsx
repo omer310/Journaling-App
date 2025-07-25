@@ -128,56 +128,8 @@ function RootLayoutContent({
                   </div>
                 )}
 
-                <button
-                  onClick={() => {
-                    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-                    setTheme(newTheme);
-                  }}
-                  className="p-2 rounded-lg bg-surface text-secondary hover:text-primary"
-                  aria-label={`Switch to ${currentTheme === 'dark' ? 'light' : 'dark'} mode`}
-                >
-                  {currentTheme === 'dark' ? (
-                    <RiSunLine className="w-5 h-5" />
-                  ) : (
-                    <RiMoonLine className="w-5 h-5" />
-                  )}
-                </button>
-
                 {user && (
                   <>
-                    <div className="relative settings-dropdown">
-                      <button
-                        onClick={() => setShowSettings(!showSettings)}
-                        className="p-2 rounded-lg bg-surface text-secondary hover:text-primary"
-                        aria-label="Settings"
-                      >
-                        <RiSettings3Line className="w-5 h-5" />
-                      </button>
-                      
-                      {showSettings && (
-                        <div className="absolute right-0 mt-2 w-48 bg-surface border border-border rounded-lg shadow-lg z-50">
-                          <button
-                            onClick={async () => {
-                              setIsCleaning(true);
-                              try {
-                                await cleanupCorruptedEntries();
-                                alert('Data cleanup completed!');
-                              } catch (error) {
-                                alert('Error during cleanup: ' + error);
-                              } finally {
-                                setIsCleaning(false);
-                                setShowSettings(false);
-                              }
-                            }}
-                            disabled={isCleaning}
-                            className="w-full px-4 py-2 text-left text-sm text-secondary hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50"
-                          >
-                            {isCleaning ? 'Cleaning...' : 'Clean Corrupted Data'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    
                     {console.log('Rendering LogoutButton for user:', user.email)}
                     <LogoutButton />
                   </>

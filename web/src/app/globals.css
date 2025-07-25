@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Indie+Flower&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -16,6 +17,8 @@
   --color-editor-text: #171717;
   --color-editor-border: #e2e8f0;
   --color-editor-toolbar: #f8fafc;
+  --font-handwriting: 'Indie Flower', system-ui;
+  --font-arabic: 'Noto Naskh Arabic', system-ui;
 }
 
 @theme dark {
@@ -74,6 +77,28 @@ html:not(.dark) {
   min-height: 300px;
   padding: 1rem;
   color: var(--color-editor-text);
+  font-family: var(--font-handwriting);
+  font-size: 1.3rem;
+  line-height: 1.7;
+  letter-spacing: 0.02em;
+}
+
+/* Style for Arabic text */
+.editor-content[dir="rtl"],
+.editor-content[lang="ar"],
+.editor-content:has(:lang(ar)) {
+  font-family: var(--font-arabic) !important;
+  font-size: 1.4rem !important;
+  line-height: 1.8 !important;
+  letter-spacing: 0 !important;
+}
+
+/* Ensure Arabic text within mixed content is styled correctly */
+.editor-content *:lang(ar) {
+  font-family: var(--font-arabic) !important;
+  font-size: 1.4rem !important;
+  line-height: 1.8 !important;
+  letter-spacing: 0 !important;
 }
 
 /* Theme transition - apply to most elements but not body to avoid conflicts */

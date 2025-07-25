@@ -51,6 +51,21 @@ interface RichTextEditorProps {
 
 const AUTOSAVE_DELAY = 1000;
 
+// Helper function to detect Arabic text
+const containsArabic = (text: string) => /[\u0600-\u06FF]/.test(text);
+
+// Helper to set language attributes on elements
+const setLanguageAttributes = (element: HTMLElement, text: string) => {
+  const isArabic = containsArabic(text);
+  if (isArabic) {
+    element.setAttribute('lang', 'ar');
+    element.setAttribute('dir', 'rtl');
+  } else {
+    element.setAttribute('lang', 'en');
+    element.setAttribute('dir', 'ltr');
+  }
+};
+
 export function RichTextEditor({
   content,
   onChange,
@@ -102,10 +117,32 @@ export function RichTextEditor({
     editorProps: {
       attributes: {
         class: 'editor-content prose dark:prose-invert max-w-none focus:outline-none',
+        dir: 'auto',
+      },
+      handleDOMEvents: {
+        input: (view, event) => {
+          const target = event.target as HTMLElement;
+          if (target && target.textContent) {
+            setLanguageAttributes(target, target.textContent);
+          }
+          return false;
+        },
       },
     },
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
+      const editorElement = document.querySelector('.editor-content');
+      if (editorElement instanceof HTMLElement) {
+        // Set language attributes on the editor container
+        setLanguageAttributes(editorElement, editor.getText());
+        
+        // Set language attributes on individual paragraphs
+        editorElement.querySelectorAll('p, h1, h2, h3, h4, h5, h6').forEach((element) => {
+          if (element instanceof HTMLElement && element.textContent) {
+            setLanguageAttributes(element, element.textContent);
+          }
+        });
+      }
       onChange(html);
     },
     immediatelyRender: false,

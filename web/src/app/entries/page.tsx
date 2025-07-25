@@ -3,7 +3,7 @@
 // Disable static generation for this authenticated page
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar } from '@/components/Calendar';
 import { Search } from '@/components/Search';
@@ -53,17 +53,45 @@ export default function EntriesPage() {
   const [selectedEntries, setSelectedEntries] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
   const { entries = [], entriesLoading, tags = [], removeEntry, removeMultipleEntries, removeTag, searchEntries, fetchEntries, lastSyncTime } = useStore();
+
+  // Prefetch entries when hovering over links
+  const prefetchEntry = useCallback((id: string) => {
+    router.prefetch(`/journal/${id}`);
+  }, [router]);
 
   // Fetch entries when component mounts
   useEffect(() => {
-    fetchEntries();
+    const loadEntries = async () => {
+      try {
+        await fetchEntries();
+      } catch (error) {
+        console.error('Error loading entries:', error);
+        setError('Failed to load entries. Please try refreshing the page.');
+      }
+    };
+    loadEntries();
   }, [fetchEntries]);
+
+  // Prefetch next batch of entries
+  useEffect(() => {
+    if (entries.length > 0) {
+      // Prefetch the first few entries
+      entries.slice(0, 5).forEach(entry => {
+        prefetchEntry(entry.id);
+      });
+    }
+  }, [entries, prefetchEntry]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    setError('');
     try {
       await fetchEntries();
+    } catch (error) {
+      console.error('Error refreshing entries:', error);
+      setError('Failed to refresh entries. Please try again.');
     } finally {
       setRefreshing(false);
     }
@@ -198,8 +226,12 @@ export default function EntriesPage() {
       tags: tags || [],
       selectedEntries,
       onSelect: toggleEntrySelection,
-      onEdit: (id: string) => router.push(`/journal/${id}`),
+      onEdit: (id: string) => {
+        prefetchEntry(id);
+        router.push(`/journal/${id}`);
+      },
       onDelete: handleDelete,
+      onHover: prefetchEntry, // Add hover handler for prefetching
     };
 
     switch (layoutMode) {
@@ -217,6 +249,11 @@ export default function EntriesPage() {
       <div className="min-h-screen bg-background">
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="flex flex-col gap-6">
+            {error && (
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-md">
+                {error}
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
               <div className="flex items-center gap-4">
                 <h1 className="text-3xl font-bold text-primary">Journal Entries</h1>
@@ -373,4 +410,4 @@ export default function EntriesPage() {
       </div>
     </ProtectedRoute>
   );
-} 
+}

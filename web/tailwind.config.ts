@@ -9,10 +9,17 @@ const config: Config = {
   darkMode: 'class',
   theme: {
     extend: {
+      fontFamily: {
+        handwriting: ['Indie Flower', 'Noto Naskh Arabic', 'system-ui'],
+        arabic: ['Noto Naskh Arabic', 'system-ui'],
+      },
       typography: (theme: any) => ({
         DEFAULT: {
           css: {
             color: theme('colors.text-primary'),
+            '[dir="rtl"]': {
+              fontFamily: theme('fontFamily.arabic'),
+            },
             a: {
               color: theme('colors.primary'),
               '&:hover': {

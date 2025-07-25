@@ -1,123 +1,169 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/components/AuthProvider';
-import { getEntry, updateEntry } from '@/lib/journal';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import ProtectedRoute from '@/components/ProtectedRoute';
+import { RichTextEditor } from '@/components/RichTextEditor';
+import { Tags } from '@/components/Tags';
+import { useStore } from '@/store/useStore';
+import { supabase } from '@/lib/supabase';
 
-interface EditJournalFormProps {
-  id: string;
-}
-
-export default function EditJournalForm({ id }: EditJournalFormProps) {
-  const [content, setContent] = useState('');
-  const [title, setTitle] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+export default function EditJournalForm({ id }: { id: string }) {
   const router = useRouter();
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedMood, setSelectedMood] = useState<'happy' | 'neutral' | 'sad' | undefined>();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const loadEntry = useCallback(async () => {
-    try {
-      const entry = await getEntry(id);
-      if (!entry) {
-        router.push('/entries');
-        return;
-      }
-      if (entry.userId !== user?.uid) {
-        router.push('/entries');
-        return;
-      }
+  const { entries, tags, updateEntry, addTag } = useStore();
+
+  // Load entry data
+  useEffect(() => {
+    const entry = entries.find(e => e.id === id);
+    if (entry) {
       setTitle(entry.title);
       setContent(entry.content);
-    } catch (error) {
-      console.error('Error loading entry:', error);
-      alert('Failed to load entry. Please try again.');
-    } finally {
-      setLoading(false);
+      setSelectedTags(entry.tags || []);
+      setSelectedMood(entry.mood);
     }
-  }, [id, user, router]);
-
-  useEffect(() => {
-    if (user && id) {
-      loadEntry();
-    }
-  }, [user, id, loadEntry]);
+  }, [id, entries]);
 
   const handleSave = async () => {
-    if (!user) {
-      router.push('/login');
+    if (!title.trim() || !content.trim()) {
+      setError('Please fill in both title and content');
       return;
     }
 
+    setSaving(true);
+    setError('');
+
     try {
-      setSaving(true);
+      // First, let's check if the user is authenticated
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw new Error('Authentication error: ' + authError.message);
+      }
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       await updateEntry(id, {
-        title,
-        content,
+        title: title.trim(),
+        content: content.trim(),
+        tags: selectedTags,
+        mood: selectedMood,
       });
-      router.push('/entries');
-    } catch (error) {
-      console.error('Error saving entry:', error);
-      alert('Failed to save entry. Please try again.');
-    } finally {
+
+      // Pre-navigate to entries page to trigger prefetch
+      router.prefetch('/entries');
+      
+      // Small delay to ensure store is updated
+      setTimeout(() => {
+        router.push('/entries');
+      }, 100);
+
+    } catch (error: any) {
+      console.error('Failed to save entry:', error);
+      setError(error.message || 'Failed to save entry. Please try again.');
       setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-primary-50 dark:bg-dark-bg flex items-center justify-center">
-        <div className="text-2xl text-primary-600 dark:text-primary-400">Loading...</div>
-      </div>
-    );
-  }
+  const handleCreateTag = (tagName: string) => {
+    const newTag = {
+      name: tagName,
+      color: `hsl(${Math.random() * 360}, 70%, 50%)`,
+    };
+    addTag(newTag);
+  };
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-primary-50 dark:bg-dark-bg">
-        <div className="max-w-5xl mx-auto px-4 py-8">
-          <div className="bg-white dark:bg-dark-card rounded-xl shadow-lg p-6">
-            <div className="mb-6">
-              <input
-                type="text"
-                placeholder="Entry Title"
-                className="w-full text-3xl font-bold border-none focus:outline-none focus:ring-0 text-primary-900 dark:text-primary-100 bg-transparent placeholder-primary-300 dark:placeholder-primary-700"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-              <div className="text-sm text-secondary-500 dark:text-secondary-400">
-                {new Date().toLocaleDateString()}
-              </div>
-            </div>
-            
-            <textarea
-              className="w-full h-96 p-4 border border-secondary-200 dark:border-dark-border bg-white dark:bg-dark-bg rounded-lg focus:ring-primary-500 focus:border-primary-500 text-secondary-900 dark:text-white placeholder-secondary-500 dark:placeholder-secondary-400 resize-none"
-              placeholder="Write your thoughts here..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-            />
-            
-            <div className="mt-6 flex justify-end space-x-4">
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-primary">Edit Entry</h1>
+            <div className="flex gap-2">
               <button
                 onClick={() => router.push('/entries')}
-                className="px-6 py-2 bg-secondary-100 dark:bg-dark-bg text-secondary-700 dark:text-secondary-300 rounded-lg hover:bg-secondary-200 dark:hover:bg-dark-border transition-colors duration-200"
-                disabled={saving}
+                className="px-4 py-2 text-muted-foreground hover:text-foreground"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving || !title.trim() || !content.trim()}
-                className="px-6 py-2 bg-primary-600 dark:bg-primary-700 text-white rounded-lg hover:bg-primary-700 dark:hover:bg-primary-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={saving}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
               >
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
+
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-md">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Entry title..."
+              className="w-full p-3 text-xl font-semibold bg-transparent border-b border-border focus:outline-none focus:border-primary"
+            />
+
+            <Tags
+              selectedTags={selectedTags}
+              availableTags={tags}
+              onTagSelect={(tagId) => setSelectedTags([...selectedTags, tagId])}
+              onTagRemove={(tagId) => setSelectedTags(selectedTags.filter(id => id !== tagId))}
+              onTagCreate={handleCreateTag}
+            />
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">How are you feeling?</label>
+              <div className="flex gap-4">
+                {([
+                  { emoji: '🥰', value: 'happy' },
+                  { emoji: '😶', value: 'neutral' },
+                  { emoji: '😢', value: 'sad' }
+                ] as const).map(({ emoji, value }) => (
+                  <label key={value} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="mood"
+                      value={value}
+                      checked={selectedMood === value}
+                      onChange={() => setSelectedMood(value)}
+                      className="sr-only"
+                    />
+                    <div className={`px-4 py-2 rounded-full border-2 transition-colors ${
+                      selectedMood === value
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-primary/50'
+                    }`}>
+                      {emoji}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <RichTextEditor
+              content={content}
+              onChange={setContent}
+              placeholder="Start writing your thoughts..."
+            />
+          </div>
         </div>
       </div>
-    </ProtectedRoute>
+    </div>
   );
 } 
