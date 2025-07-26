@@ -41,9 +41,15 @@ export default function LoginPage() {
       return;
     }
 
+    if (loading) {
+      return; // Prevent multiple submissions
+    }
+
     try {
       setLoading(true);
       setError('');
+      
+      console.log('Attempting login for:', email);
       
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -54,11 +60,15 @@ export default function LoginPage() {
         throw error;
       }
 
-      router.push('/journal');
+      console.log('Login successful, redirecting...');
+      
+      // Add a small delay to ensure auth state is properly set
+      setTimeout(() => {
+        router.push('/journal');
+      }, 100);
+      
     } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') {
-        console.debug('Login error:', error);
-      }
+      console.error('Login error:', error);
       setError(getErrorMessage(error));
     } finally {
       setLoading(false);
@@ -111,6 +121,7 @@ export default function LoginPage() {
                   className="w-full pl-12 pr-4 py-3.5 bg-surface/50 border border-border rounded-xl text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 hover:bg-surface/80"
                   placeholder="Enter your email"
                   required
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -132,11 +143,13 @@ export default function LoginPage() {
                   className="w-full pl-12 pr-12 py-3.5 bg-surface/50 border border-border rounded-xl text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 hover:bg-surface/80"
                   placeholder="Enter your password"
                   required
+                  disabled={loading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-4 flex items-center text-secondary hover:text-text-primary transition-colors duration-200"
+                  disabled={loading}
                 >
                   {showPassword ? (
                     <RiEyeOffLine className="h-5 w-5" />

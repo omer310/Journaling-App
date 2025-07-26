@@ -14,20 +14,27 @@ export default function ProtectedRoute({
 
   useEffect(() => {
     console.log('ProtectedRoute: loading=', loading, 'user=', user?.email);
+    
+    // Only redirect if we're not loading and there's no user
     if (!loading && !user) {
       console.log('No user found, redirecting to login...');
       router.push('/login');
     }
   }, [user, loading, router]);
 
+  // Show loading state while auth is being determined
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-2xl text-primary">Loading...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-secondary">Loading...</p>
+        </div>
       </div>
     );
   }
 
+  // Don't render anything if no user (will redirect)
   if (!user) {
     return null;
   }

@@ -151,8 +151,8 @@ export function RichTextEditor({
   // Insert transcript into editor when it changes
   useEffect(() => {
     if (editor && (finalTranscript || interimTranscript)) {
-      console.log('Final transcript:', finalTranscript);
-      console.log('Interim transcript:', interimTranscript);
+      ('Final transcript:', finalTranscript);
+      ('Interim transcript:', interimTranscript);
       editor.commands.focus();
       if (finalTranscript) {
         editor.commands.insertContent(finalTranscript + ' ');
@@ -165,7 +165,7 @@ export function RichTextEditor({
     if (!editor || !autosave) return;
 
     const timer = setTimeout(() => {
-      console.log('Autosaving...', editor.getHTML());
+      ('Autosaving...', editor.getHTML());
     }, AUTOSAVE_DELAY);
 
     return () => clearTimeout(timer);
@@ -194,10 +194,10 @@ export function RichTextEditor({
     }
 
     if (listening) {
-      console.log('Stopping speech recognition');
+      ('Stopping speech recognition');
       SpeechRecognition.stopListening();
     } else {
-      console.log('Starting speech recognition');
+      ('Starting speech recognition');
       try {
         // Focus the editor before starting speech recognition
         editor?.commands.focus();

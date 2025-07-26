@@ -59,7 +59,7 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
     // First, try to find the entry in the store
     const entry = entries.find((e) => e.id === params.id);
     if (entry) {
-      console.log('Found entry in store:', entry);
+      ('Found entry in store:', entry);
       setTitle(entry.title);
       setContent(entry.content);
       setSelectedTags(getTagsArray(entry.tags));
@@ -78,7 +78,7 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
           .single();
 
         if (error || !entry) {
-          console.log('Entry not found in Supabase');
+          ('Entry not found in Supabase');
           if (retryCount < 3) {
             // Retry a few times before showing error
             setTimeout(() => {
@@ -91,7 +91,7 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
           return;
         }
 
-        console.log('Found entry in Supabase:', entry);
+        ('Found entry in Supabase:', entry);
         setTitle(entry.title || '');
         setContent(entry.content || '');
         setSelectedTags(getTagsArray(entry.tags));

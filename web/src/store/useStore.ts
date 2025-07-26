@@ -422,6 +422,17 @@ export const useStore = create<AppState>()(
             throw new Error('User not authenticated');
           }
 
+          // Optimistic update - remove from local state immediately
+          const currentState = get();
+          const entryToDelete = currentState.entries.find(e => e.id === id);
+          
+          set((state) => ({
+            entries: state.entries.filter(e => e.id !== id),
+            cachedEntries: state.cachedEntries.filter(e => e.id !== id),
+            lastFetchTime: Date.now(),
+            lastSyncTime: new Date().toISOString()
+          }));
+
           const { error } = await supabase
             .from('journal_entries')
             .delete()
@@ -430,11 +441,19 @@ export const useStore = create<AppState>()(
 
           if (error) {
             console.error('Supabase error:', error);
+            // Revert optimistic update on error
+            if (entryToDelete) {
+              set((state) => ({
+                entries: [entryToDelete, ...state.entries],
+                cachedEntries: [entryToDelete, ...state.cachedEntries],
+                lastFetchTime: Date.now(),
+                lastSyncTime: new Date().toISOString()
+              }));
+            }
             throw error;
           }
 
-          // Refresh entries after deleting
-          await get().fetchEntries();
+          // Success - no need to refresh entries since we already updated the state
         } catch (error) {
           console.error('Error deleting entry:', error);
           throw error;
@@ -447,6 +466,17 @@ export const useStore = create<AppState>()(
             throw new Error('User not authenticated');
           }
 
+          // Optimistic update - remove from local state immediately
+          const currentState = get();
+          const entriesToDelete = currentState.entries.filter(e => ids.includes(e.id));
+          
+          set((state) => ({
+            entries: state.entries.filter(e => !ids.includes(e.id)),
+            cachedEntries: state.cachedEntries.filter(e => !ids.includes(e.id)),
+            lastFetchTime: Date.now(),
+            lastSyncTime: new Date().toISOString()
+          }));
+
           // Delete multiple entries in a single query
           const { error } = await supabase
             .from('journal_entries')
@@ -456,11 +486,17 @@ export const useStore = create<AppState>()(
 
           if (error) {
             console.error('Supabase error:', error);
+            // Revert optimistic update on error
+            set((state) => ({
+              entries: [...entriesToDelete, ...state.entries],
+              cachedEntries: [...entriesToDelete, ...state.cachedEntries],
+              lastFetchTime: Date.now(),
+              lastSyncTime: new Date().toISOString()
+            }));
             throw error;
           }
 
-          // Refresh entries after deleting
-          await get().fetchEntries();
+          // Success - no need to refresh entries since we already updated the state
         } catch (error) {
           console.error('Error deleting multiple entries:', error);
           throw error;
@@ -614,6 +650,7 @@ export const useStore = create<AppState>()(
 
 // Set up Supabase sync - moved to AuthProvider to avoid race conditions
 let currentChannel: any = null;
+let realtimeUpdateTimeout: NodeJS.Timeout | null = null;
 
 // Function to set up real-time subscription
 export const setupRealtimeSubscription = async (userId: string) => {
@@ -634,25 +671,22 @@ export const setupRealtimeSubscription = async (userId: string) => {
       async (payload) => {
         console.log('Real-time update:', payload);
         
-        // Add a longer delay and debounce multiple updates
-        const store = useStore.getState();
-        if (store.entriesLoading) {
-          console.log('Skipping real-time update while entries are loading');
-          return;
+        // Clear any existing timeout
+        if (realtimeUpdateTimeout) {
+          clearTimeout(realtimeUpdateTimeout);
         }
-
-        // Set loading state immediately
-        store.setEntries([]);
-        store.setLastSyncTime(''); // Empty string instead of null
         
-        // Wait for database to settle
-        setTimeout(async () => {
+        // Debounce real-time updates to prevent excessive refreshes
+        realtimeUpdateTimeout = setTimeout(async () => {
           try {
-            await store.fetchEntries();
+            const store = useStore.getState();
+            if (!store.entriesLoading) {
+              await store.fetchEntries();
+            }
           } catch (error) {
             console.error('Error fetching entries after real-time update:', error);
           }
-        }, 1000);
+        }, 500); // Reduced delay for better responsiveness
       }
     )
     .subscribe((status) => {
@@ -665,5 +699,9 @@ export const cleanupRealtimeSubscription = () => {
   if (currentChannel) {
     supabase.removeChannel(currentChannel);
     currentChannel = null;
+  }
+  if (realtimeUpdateTimeout) {
+    clearTimeout(realtimeUpdateTimeout);
+    realtimeUpdateTimeout = null;
   }
 }; 

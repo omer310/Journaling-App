@@ -32,9 +32,15 @@ export function SocialAuth() {
   const isRegister = pathname === '/register';
 
   const handleGoogleSignIn = async () => {
+    if (loading) {
+      return; // Prevent multiple submissions
+    }
+
     try {
       setError(null);
       setLoading(true);
+      
+      console.log('Attempting Google sign in...');
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -46,10 +52,11 @@ export function SocialAuth() {
       if (error) {
         throw error;
       }
+
+      console.log('Google sign in initiated successfully');
+      
     } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') {
-        console.debug('Google sign in error:', error);
-      }
+      console.error('Google sign in error:', error);
       setError(getGoogleErrorMessage(error));
     } finally {
       setLoading(false);

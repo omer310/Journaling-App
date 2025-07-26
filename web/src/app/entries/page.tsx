@@ -1,8 +1,5 @@
 'use client';
 
-// Disable static generation for this authenticated page
-export const dynamic = 'force-dynamic';
-
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar } from '@/components/Calendar';
@@ -25,10 +22,11 @@ import {
 import { exportToPdf, exportToMarkdown, exportToText } from '@/services/export';
 
 type ViewMode = 'list' | 'calendar' | 'analytics';
+
 type Mood = 'happy' | 'neutral' | 'sad';
 
-// Helper function to safely get tags array
-function getTagsArray(tags: any): string[] {
+// Helper function to get tags array
+const getTagsArray = (tags: any): string[] => {
   if (Array.isArray(tags)) {
     return tags;
   }
@@ -41,7 +39,7 @@ function getTagsArray(tags: any): string[] {
     }
   }
   return [];
-}
+};
 
 export default function EntriesPage() {
   const router = useRouter();
@@ -54,6 +52,7 @@ export default function EntriesPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
   const { entries = [], entriesLoading, tags = [], removeEntry, removeMultipleEntries, removeTag, searchEntries, fetchEntries, lastSyncTime } = useStore();
 
   // Prefetch entries when hovering over links
@@ -65,14 +64,24 @@ export default function EntriesPage() {
   useEffect(() => {
     const loadEntries = async () => {
       try {
+        setError('');
         await fetchEntries();
+        setRetryCount(0); // Reset retry count on success
       } catch (error) {
         console.error('Error loading entries:', error);
         setError('Failed to load entries. Please try refreshing the page.');
+        
+        // Auto-retry up to 3 times
+        if (retryCount < 3) {
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+          }, 2000 * (retryCount + 1)); // Exponential backoff
+        }
       }
     };
+    
     loadEntries();
-  }, [fetchEntries]);
+  }, [fetchEntries, retryCount]);
 
   // Prefetch next batch of entries
   useEffect(() => {
@@ -247,163 +256,195 @@ export default function EntriesPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="flex flex-col gap-6">
-            {error && (
-              <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-md">
-                {error}
-              </div>
-            )}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex items-center gap-4">
-                <h1 className="text-3xl font-bold text-primary">Journal Entries</h1>
-                <button
-                  onClick={handleRefresh}
-                  disabled={refreshing || entriesLoading}
-                  className="p-2 rounded-lg bg-surface text-secondary hover:text-primary disabled:opacity-50"
-                  title="Refresh entries"
-                >
-                  <RiRefreshLine className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-                </button>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-text-primary">Journal Entries</h1>
+              <p className="text-secondary mt-2">
+                {filteredEntries.length} of {entries.length} entries
                 {lastSyncTime && (
-                  <div className="text-xs text-secondary">
-                    Last sync: {new Date(lastSyncTime).toLocaleTimeString()}
-                  </div>
+                  <span className="ml-2 text-xs">
+                    • Last synced {new Date(lastSyncTime).toLocaleTimeString()}
+                  </span>
                 )}
-                {viewMode === 'list' && filteredEntries.length > 0 && (
-                  <button
-                    onClick={toggleAllEntries}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#2a2a2a] text-white hover:bg-[#333] transition-colors duration-200"
-                  >
-                    {selectedEntries.length === filteredEntries.length ? (
-                      <RiCheckboxFill className="w-4 h-4 text-[#00ff9d]" />
-                    ) : (
-                      <RiCheckboxBlankLine className="w-4 h-4" />
-                    )}
-                    <span className="text-sm">
-                      {selectedEntries.length > 0
-                        ? `Selected ${selectedEntries.length}`
-                        : 'Select All'}
-                    </span>
-                  </button>
-                )}
-              </div>
-              <div className="flex gap-4">
-                {selectedEntries.length > 0 && (
-                  <button
-                    onClick={handleDeleteSelected}
-                    disabled={deleting || entriesLoading}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors duration-200 disabled:opacity-50"
-                    title={`Delete ${selectedEntries.length} selected entries`}
-                  >
-                    <RiDeleteBinLine className={`w-4 h-4 ${deleting ? 'animate-spin' : ''}`} />
-                    <span className="text-sm">
-                      {deleting ? 'Deleting...' : 'Delete Selected'}
-                    </span>
-                  </button>
-                )}
-                <ExportMenu
-                  entries={selectedEntries.length > 0
-                    ? filteredEntries.filter((entry) => selectedEntries.includes(entry.id))
-                    : filteredEntries}
-                  tags={tags || []}
-                  onExport={handleExport}
-                />
-                {viewMode === 'list' && (
-                  <LayoutSelector value={layoutMode} onChange={setLayoutMode} />
-                )}
-                <div className="flex gap-1 bg-[#2a2a2a] p-1 rounded-lg">
-                  <button
-                    onClick={() => setViewMode('list')}
-                    className={`p-2 rounded-lg transition-colors duration-200 ${
-                      viewMode === 'list'
-                        ? 'bg-[#00ff9d] text-black'
-                        : 'text-[#888] hover:text-white'
-                    }`}
-                  >
-                    <RiBarChartLine className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode('calendar')}
-                    className={`p-2 rounded-lg transition-colors duration-200 ${
-                      viewMode === 'calendar'
-                        ? 'bg-[#00ff9d] text-black'
-                        : 'text-[#888] hover:text-white'
-                    }`}
-                  >
-                    <RiCalendarLine className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode('analytics')}
-                    className={`p-2 rounded-lg transition-colors duration-200 ${
-                      viewMode === 'analytics'
-                        ? 'bg-[#00ff9d] text-black'
-                        : 'text-[#888] hover:text-white'
-                    }`}
-                  >
-                    <RiBarChartLine className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              <div className="lg:col-span-1 space-y-6">
-                <Search
-                  onSearch={handleSearch}
-                  onResultClick={handleSearchResultClick}
-                  className="w-full"
-                />
+            <div className="flex gap-4 mt-4 sm:mt-0">
+              {selectedEntries.length > 0 && (
+                <button
+                  onClick={handleDeleteSelected}
+                  disabled={deleting || entriesLoading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors duration-200 disabled:opacity-50"
+                  title={`Delete ${selectedEntries.length} selected entries`}
+                >
+                  <RiDeleteBinLine className={`w-4 h-4 ${deleting ? 'animate-spin' : ''}`} />
+                  <span className="text-sm">
+                    {deleting ? 'Deleting...' : 'Delete Selected'}
+                  </span>
+                </button>
+              )}
+              <ExportMenu
+                entries={selectedEntries.length > 0
+                  ? filteredEntries.filter((entry) => selectedEntries.includes(entry.id))
+                  : filteredEntries}
+                tags={tags || []}
+                onExport={handleExport}
+              />
+              {viewMode === 'list' && (
+                <LayoutSelector value={layoutMode} onChange={setLayoutMode} />
+              )}
+            </div>
+          </div>
 
+          {/* Error message */}
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl mb-6">
+              <div className="flex items-center justify-between">
+                <span>{error}</span>
+                <button
+                  onClick={handleRefresh}
+                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {/* Sidebar */}
+            <div className="lg:col-span-1">
+              <div className="space-y-6">
+                {/* View mode selector */}
+                <div className="bg-surface rounded-xl shadow-lg p-6">
+                  <h3 className="text-lg font-semibold text-text-primary mb-4">View Mode</h3>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
+                        viewMode === 'list'
+                          ? 'bg-primary text-white'
+                          : 'bg-surface-hover text-text-primary hover:bg-surface-hover/80'
+                      }`}
+                    >
+                      <RiCheckboxBlankLine className="w-5 h-5" />
+                      <span>List View</span>
+                    </button>
+                    <button
+                      onClick={() => setViewMode('calendar')}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
+                        viewMode === 'calendar'
+                          ? 'bg-primary text-white'
+                          : 'bg-surface-hover text-text-primary hover:bg-surface-hover/80'
+                      }`}
+                    >
+                      <RiCalendarLine className="w-5 h-5" />
+                      <span>Calendar View</span>
+                    </button>
+                    <button
+                      onClick={() => setViewMode('analytics')}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
+                        viewMode === 'analytics'
+                          ? 'bg-primary text-white'
+                          : 'bg-surface-hover text-text-primary hover:bg-surface-hover/80'
+                      }`}
+                    >
+                      <RiBarChartLine className="w-5 h-5" />
+                      <span>Analytics</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Search */}
+                <Search onSearch={handleSearch} onResultClick={handleSearchResultClick} />
+
+                {/* Filters */}
                 <FilterPanel
                   selectedTags={selectedTags}
                   availableTags={tags || []}
                   onTagSelect={(tagId) => setSelectedTags([...selectedTags, tagId])}
-                  onTagRemove={(tagId) => {
-                    setSelectedTags(selectedTags.filter((id) => id !== tagId));
-                    removeTag(tagId);
-                  }}
+                  onTagRemove={(tagId) => setSelectedTags(selectedTags.filter(id => id !== tagId))}
                   selectedMoods={selectedMoods}
                   onMoodSelect={(mood) => setSelectedMoods([...selectedMoods, mood])}
-                  onMoodRemove={(mood) =>
-                    setSelectedMoods(selectedMoods.filter((m) => m !== mood))
-                  }
+                  onMoodRemove={(mood) => setSelectedMoods(selectedMoods.filter(m => m !== mood))}
                   dateRange={dateRange}
                   onDateRangeChange={setDateRange}
                 />
-              </div>
 
-              <div className="lg:col-span-3">
-                {entriesLoading ? (
-                  <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                      <p className="text-secondary">Loading entries...</p>
+                {/* Bulk actions */}
+                {viewMode === 'list' && (
+                  <div className="bg-surface rounded-xl shadow-lg p-6">
+                    <h3 className="text-lg font-semibold text-text-primary mb-4">Bulk Actions</h3>
+                    <div className="space-y-3">
+                      <button
+                        onClick={toggleAllEntries}
+                        className="w-full flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-hover text-text-primary hover:bg-surface-hover/80 transition-colors duration-200"
+                      >
+                        {selectedEntries.length === filteredEntries.length ? (
+                          <RiCheckboxBlankLine className="w-4 h-4" />
+                        ) : (
+                          <RiCheckboxFill className="w-4 h-4" />
+                        )}
+                        <span className="text-sm">
+                          {selectedEntries.length === filteredEntries.length
+                            ? 'Deselect All'
+                            : 'Select All'}
+                        </span>
+                      </button>
+                      <button
+                        onClick={handleRefresh}
+                        disabled={refreshing || entriesLoading}
+                        className="w-full flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-hover text-text-primary hover:bg-surface-hover/80 transition-colors duration-200 disabled:opacity-50"
+                      >
+                        <RiRefreshLine className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                        <span className="text-sm">
+                          {refreshing ? 'Refreshing...' : 'Refresh'}
+                        </span>
+                      </button>
                     </div>
                   </div>
-                ) : viewMode === 'analytics' ? (
-                  <Analytics entries={filteredEntries} />
-                ) : viewMode === 'calendar' ? (
-                  <Calendar
-                    entries={filteredEntries.map((entry) => ({
-                      id: entry.id,
-                      date: entry.date,
-                      title: entry.title,
-                    }))}
-                    onDateSelect={(date) => {
-                      const entriesOnDate = filteredEntries.filter(
-                        (entry) =>
-                          new Date(entry.date).toDateString() === date.toDateString()
-                      );
-                      if (entriesOnDate.length === 1) {
-                        router.push(`/journal/${entriesOnDate[0].id}`);
-                      }
-                    }}
-                  />
-                ) : (
-                  renderEntries()
                 )}
               </div>
+            </div>
+
+            {/* Main content */}
+            <div className="lg:col-span-3">
+              {entriesLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-secondary">Loading entries...</p>
+                    {retryCount > 0 && (
+                      <p className="text-xs text-secondary mt-2">
+                        Retry attempt {retryCount}/3
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : viewMode === 'analytics' ? (
+                <Analytics entries={filteredEntries} />
+              ) : viewMode === 'calendar' ? (
+                <Calendar
+                  entries={filteredEntries.map((entry) => ({
+                    id: entry.id,
+                    date: entry.date,
+                    title: entry.title,
+                  }))}
+                  onDateSelect={(date) => {
+                    const entriesOnDate = filteredEntries.filter(
+                      (entry) =>
+                        new Date(entry.date).toDateString() === date.toDateString()
+                    );
+                    if (entriesOnDate.length === 1) {
+                      router.push(`/journal/${entriesOnDate[0].id}`);
+                    }
+                  }}
+                />
+              ) : (
+                renderEntries()
+              )}
             </div>
           </div>
         </div>

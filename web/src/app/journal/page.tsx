@@ -45,7 +45,7 @@ export default function JournalPage() {
         throw new Error('User not authenticated');
       }
 
-      console.log('User authenticated:', user.id);
+      ('User authenticated:', user.id);
 
       await addEntry({
         title: title.trim(),

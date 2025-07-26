@@ -22,7 +22,7 @@ function RootLayoutContent({
   const [showSettings, setShowSettings] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
   
-  console.log('RootLayoutContent: user=', user?.email, 'loading=', loading);
+  ('RootLayoutContent: user=', user?.email, 'loading=', loading);
 
   useEffect(() => {
     // Theme setup
@@ -130,7 +130,7 @@ function RootLayoutContent({
 
                 {user && (
                   <>
-                    {console.log('Rendering LogoutButton for user:', user.email)}
+                    {('Rendering LogoutButton for user:', user.email)}
                     <LogoutButton />
                   </>
                 )}
