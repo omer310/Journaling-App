@@ -1,0 +1,7 @@
+.social-auth-container button {
+  background-color: black;
+}
+
+.social-auth-container button:hover {
+  background-color: #6a6868;
+}

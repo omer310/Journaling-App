@@ -1,43 +1,50 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import { SocialAuth } from '@/components/SocialAuth';
-import Link from 'next/link';
-import { RiEyeLine, RiEyeOffLine, RiMailLine, RiLockLine, RiArrowRightLine } from 'react-icons/ri';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { SocialAuth } from "@/components/SocialAuth";
+import Link from "next/link";
+import {
+  RiEyeLine,
+  RiEyeOffLine,
+  RiMailLine,
+  RiLockLine,
+  RiArrowRightLine,
+} from "react-icons/ri";
+import "./page.css";
 
 const getErrorMessage = (error: any) => {
   if (error.message) {
-    if (error.message.includes('Invalid login credentials')) {
-      return 'Invalid email or password. Please try again.';
+    if (error.message.includes("Invalid login credentials")) {
+      return "Invalid email or password. Please try again.";
     }
-    if (error.message.includes('Invalid email')) {
-      return 'Invalid email address. Please enter a valid email.';
+    if (error.message.includes("Invalid email")) {
+      return "Invalid email address. Please enter a valid email.";
     }
-    if (error.message.includes('Email not confirmed')) {
-      return 'Please check your email and confirm your account.';
+    if (error.message.includes("Email not confirmed")) {
+      return "Please check your email and confirm your account.";
     }
-    if (error.message.includes('Too many requests')) {
-      return 'Too many failed attempts. Please try again later.';
+    if (error.message.includes("Too many requests")) {
+      return "Too many failed attempts. Please try again later.";
     }
   }
-  return 'Failed to log in. Please try again.';
+  return "Failed to log in. Please try again.";
 };
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
-      setError('Please fill in all fields');
+      setError("Please fill in all fields");
       return;
     }
 
@@ -47,10 +54,10 @@ export default function LoginPage() {
 
     try {
       setLoading(true);
-      setError('');
-      
-      console.log('Attempting login for:', email);
-      
+      setError("");
+
+      console.log("Attempting login for:", email);
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -60,15 +67,14 @@ export default function LoginPage() {
         throw error;
       }
 
-      console.log('Login successful, redirecting...');
-      
+      console.log("Login successful, redirecting...");
+
       // Add a small delay to ensure auth state is properly set
       setTimeout(() => {
-        router.push('/journal');
+        router.push("/journal");
       }, 100);
-      
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
       setError(getErrorMessage(error));
     } finally {
       setLoading(false);
@@ -81,10 +87,10 @@ export default function LoginPage() {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 pointer-events-none" />
       <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-      
+
       <div className="w-full max-w-md relative z-10">
         {/* Main card */}
-        <div className="bg-white/80 dark:bg-black/40 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-8 shadow-2xl shadow-black/10 dark:shadow-black/30">
+        <div className="bg-black/80 dark:bg-black/40 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-8 shadow-2xl shadow-black/10 dark:shadow-black/30">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-light rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/20">
@@ -93,7 +99,9 @@ export default function LoginPage() {
             <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
               Welcome Back
             </h1>
-            <p className="mt-2 text-secondary">Sign in to continue your journey</p>
+            <p className="mt-2 text-secondary">
+              Sign in to continue your journey
+            </p>
           </div>
 
           {/* Form */}
@@ -106,7 +114,10 @@ export default function LoginPage() {
 
             {/* Email field */}
             <div className="space-y-2">
-              <label htmlFor="email" className="block text-sm font-medium text-text-primary">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-text-primary"
+              >
                 Email Address
               </label>
               <div className="relative">
@@ -128,7 +139,10 @@ export default function LoginPage() {
 
             {/* Password field */}
             <div className="space-y-2">
-              <label htmlFor="password" className="block text-sm font-medium text-text-primary">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-text-primary"
+              >
                 Password
               </label>
               <div className="relative">
@@ -137,7 +151,7 @@ export default function LoginPage() {
                 </div>
                 <input
                   id="password"
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-12 pr-12 py-3.5 bg-surface/50 border border-border rounded-xl text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 hover:bg-surface/80"
@@ -183,16 +197,16 @@ export default function LoginPage() {
           </form>
 
           {/* Social auth */}
-          <div className="mt-8">
+          <div className="social-auth-container mt-8">
             <SocialAuth />
           </div>
 
           {/* Footer */}
           <div className="mt-8 text-center">
             <p className="text-sm text-secondary">
-              Don't have an account?{' '}
-              <Link 
-                href="/register" 
+              Don't have an account?{" "}
+              <Link
+                href="/register"
                 className="text-primary hover:text-primary-light font-medium transition-colors duration-200 hover:underline"
               >
                 Create one here
@@ -210,4 +224,4 @@ export default function LoginPage() {
       </div>
     </div>
   );
-} 
+}
