@@ -58,6 +58,10 @@ interface AppState {
   addCustomTheme: (theme: Theme) => void;
   removeCustomTheme: (themeName: string) => void;
 
+  // Layout preferences
+  layoutMode: 'list' | 'grid' | 'compact';
+  setLayoutMode: (mode: 'list' | 'grid' | 'compact') => void;
+
   // Cache management
   cachedEntries: JournalEntry[];
   lastFetchTime: number;
@@ -115,6 +119,10 @@ export const useStore = create<AppState>()(
         set((state) => ({
           customThemes: state.customThemes.filter((t) => t.name !== themeName),
         })),
+
+      // Layout preferences
+      layoutMode: 'list',
+      setLayoutMode: (mode) => set({ layoutMode: mode }),
 
       // Cache management
       cachedEntries: [],
@@ -641,6 +649,7 @@ export const useStore = create<AppState>()(
       partialize: (state) => ({
         currentTheme: state.currentTheme,
         customThemes: state.customThemes,
+        layoutMode: state.layoutMode,
         tags: state.tags,
         pendingSync: state.pendingSync,
       }),

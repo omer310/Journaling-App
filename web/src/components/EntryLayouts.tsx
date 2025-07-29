@@ -86,7 +86,12 @@ export function ListLayout({ entries, tags, selectedEntries, onSelect, onEdit, o
                   <h2 className="text-xl font-semibold text-primary mb-2">{entry.title}</h2>
                   <div className="flex items-center gap-2 mb-4">
                     <p className="text-sm text-secondary">
-                      {new Date(entry.date).toLocaleDateString()} at{' '}
+                      {new Date(entry.date).toLocaleDateString('en-US', { 
+                        weekday: 'long',
+                        year: 'numeric', 
+                        month: 'numeric', 
+                        day: 'numeric' 
+                      })} at{' '}
                       {new Date(entry.date).toLocaleTimeString()}
                     </p>
                     {entry.source && (
@@ -217,7 +222,11 @@ export function GridLayout({ entries = [], tags = [], selectedEntries = [], onSe
             <h2 className="text-lg font-semibold text-primary mb-1">{entry.title}</h2>
             <div className="flex items-center gap-2 mb-2">
               <p className="text-xs text-secondary">
-                {new Date(entry.date).toLocaleDateString()}
+                {new Date(entry.date).toLocaleDateString('en-US', { 
+                  weekday: 'short',
+                  month: 'numeric', 
+                  day: 'numeric' 
+                })}
               </p>
               {entry.source && (
                 <span className={`px-1 py-0.5 text-xs rounded-full ${
@@ -310,7 +319,11 @@ export function CompactLayout({ entries = [], tags = [], selectedEntries = [], o
                 <div className="flex items-center gap-2 mb-1">
                   <h2 className="text-base font-medium text-primary truncate">{entry.title}</h2>
                   <span className="text-xs text-secondary whitespace-nowrap">
-                    {new Date(entry.date).toLocaleDateString()}
+                    {new Date(entry.date).toLocaleDateString('en-US', { 
+                      weekday: 'short',
+                      month: 'numeric', 
+                      day: 'numeric' 
+                    })}
                   </span>
                   {entry.source && (
                     <span className={`px-1 py-0.5 text-xs rounded-full ${

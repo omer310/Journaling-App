@@ -13,6 +13,7 @@ interface EditJournalFormProps {
 export function EditJournalForm({ id }: EditJournalFormProps) {
   const [content, setContent] = useState('');
   const [title, setTitle] = useState('');
+  const [entryDate, setEntryDate] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -25,12 +26,13 @@ export function EditJournalForm({ id }: EditJournalFormProps) {
         router.push('/entries');
         return;
       }
-      if (entry.userId !== user?.uid) {
+      if (entry.userId !== user?.id) {
         router.push('/entries');
         return;
       }
       setTitle(entry.title);
       setContent(entry.content);
+      setEntryDate(entry.date);
     } catch (error) {
       console.error('Error loading entry:', error);
       alert('Failed to load entry. Please try again.');
@@ -56,6 +58,7 @@ export function EditJournalForm({ id }: EditJournalFormProps) {
       await updateEntry(id, {
         title,
         content,
+        date: entryDate,
       });
       router.push('/entries');
     } catch (error) {
@@ -90,6 +93,21 @@ export function EditJournalForm({ id }: EditJournalFormProps) {
               <div className="text-sm text-secondary-500 dark:text-secondary-400">
                 {new Date().toLocaleDateString()}
               </div>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-2">
+                Entry Date & Time
+              </label>
+              <input
+                type="datetime-local"
+                value={entryDate}
+                onChange={(e) => setEntryDate(e.target.value)}
+                className="w-full p-3 border border-secondary-200 dark:border-dark-border bg-white dark:bg-dark-bg rounded-lg focus:ring-primary-500 focus:border-primary-500 text-secondary-900 dark:text-white"
+              />
+              <p className="text-xs text-secondary-500 dark:text-secondary-400 mt-1">
+                Set the date and time when this entry was originally written
+              </p>
             </div>
             
             <textarea

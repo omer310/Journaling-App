@@ -36,6 +36,7 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
   const { entries, tags, updateEntry, addTag } = useStore();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [entryDate, setEntryDate] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [mood, setMood] = useState<'happy' | 'neutral' | 'sad' | undefined>(undefined);
   const [loading, setLoading] = useState(true);
@@ -59,9 +60,10 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
     // First, try to find the entry in the store
     const entry = entries.find((e) => e.id === params.id);
     if (entry) {
-      ('Found entry in store:', entry);
+      console.log('Found entry in store:', entry);
       setTitle(entry.title);
       setContent(entry.content);
+      setEntryDate(entry.date || '');
       setSelectedTags(getTagsArray(entry.tags));
       setMood(entry.mood);
       setLoading(false);
@@ -91,9 +93,10 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
           return;
         }
 
-        ('Found entry in Supabase:', entry);
+        console.log('Found entry in Supabase:', entry);
         setTitle(entry.title || '');
         setContent(entry.content || '');
+        setEntryDate(entry.date || '');
         setSelectedTags(getTagsArray(entry.tags));
         setMood(entry.mood);
         setLoading(false);
@@ -115,6 +118,7 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
       await updateEntry(params.id, {
         title: title.trim(),
         content: content.trim(),
+        date: entryDate,
         tags: selectedTags,
         mood,
       });
@@ -196,6 +200,24 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
                   className="w-full px-3 py-2 bg-surface border border-border rounded-md text-primary focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="Enter title..."
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-primary mb-2">
+                  Entry Date & Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={entryDate}
+                  onChange={(e) => setEntryDate(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface border border-border rounded-md text-primary focus:outline-none focus:ring-2 focus:ring-primary [&::-webkit-calendar-picker-indicator]:bg-primary [&::-webkit-calendar-picker-indicator]:rounded [&::-webkit-calendar-picker-indicator]:p-1 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:hover:bg-primary/80 [&::-webkit-datetime-edit]:text-primary [&::-webkit-datetime-edit-fields-wrapper]:text-primary [&::-webkit-datetime-edit-text]:text-primary [&::-webkit-datetime-edit-month-field]:text-primary [&::-webkit-datetime-edit-day-field]:text-primary [&::-webkit-datetime-edit-year-field]:text-primary [&::-webkit-datetime-edit-hour-field]:text-primary [&::-webkit-datetime-edit-minute-field]:text-primary [&::-webkit-datetime-edit-ampm-field]:text-primary"
+                  style={{
+                    colorScheme: 'dark'
+                  }}
+                />
+                <p className="text-xs text-secondary mt-1">
+                  Set the date and time when this entry was originally written
+                </p>
               </div>
 
               <div>

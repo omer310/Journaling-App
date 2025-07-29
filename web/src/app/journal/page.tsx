@@ -11,6 +11,7 @@ import { Tags } from '@/components/Tags';
 import { useStore } from '@/store/useStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { supabase } from '@/lib/supabase';
+import { getCurrentTimestamp } from '@/lib/dateUtils';
 
 export default function JournalPage() {
   const router = useRouter();
@@ -45,12 +46,12 @@ export default function JournalPage() {
         throw new Error('User not authenticated');
       }
 
-      ('User authenticated:', user.id);
+      console.log('User authenticated:', user.id);
 
       await addEntry({
         title: title.trim(),
         content: content.trim(),
-        date: new Date().toISOString().split('T')[0],
+        date: getCurrentTimestamp(),
         tags: selectedTags,
         mood: selectedMood,
       });

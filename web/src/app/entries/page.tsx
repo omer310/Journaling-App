@@ -44,7 +44,6 @@ const getTagsArray = (tags: any): string[] => {
 export default function EntriesPage() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('list');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedMoods, setSelectedMoods] = useState<Mood[]>([]);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -53,7 +52,19 @@ export default function EntriesPage() {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
   const [retryCount, setRetryCount] = useState(0);
-  const { entries = [], entriesLoading, tags = [], removeEntry, removeMultipleEntries, removeTag, searchEntries, fetchEntries, lastSyncTime } = useStore();
+  const { 
+    entries = [], 
+    entriesLoading, 
+    tags = [], 
+    removeEntry, 
+    removeMultipleEntries, 
+    removeTag, 
+    searchEntries, 
+    fetchEntries, 
+    lastSyncTime,
+    layoutMode,
+    setLayoutMode
+  } = useStore();
 
   // Prefetch entries when hovering over links
   const prefetchEntry = useCallback((id: string) => {
