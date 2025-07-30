@@ -55,3 +55,33 @@ export function getCurrentTimestamp(): string {
   // Create a local datetime string that won't be affected by timezone conversion
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
 }
+
+// Inactivity timer utilities for security
+export function getLastActivityTime(): number {
+  return parseInt(localStorage.getItem('lastActivityTime') || '0');
+}
+
+export function updateLastActivityTime(): void {
+  localStorage.setItem('lastActivityTime', Date.now().toString());
+}
+
+export function getInactivityTimeout(): number {
+  // Default to 30 minutes (1800000 ms), but can be configured
+  return parseInt(localStorage.getItem('inactivityTimeout') || '1800000');
+}
+
+export function setInactivityTimeout(timeoutMs: number): void {
+  localStorage.setItem('inactivityTimeout', timeoutMs.toString());
+}
+
+export function checkInactivity(): boolean {
+  const lastActivity = getLastActivityTime();
+  const timeout = getInactivityTimeout();
+  const now = Date.now();
+  
+  return (now - lastActivity) > timeout;
+}
+
+export function clearInactivityData(): void {
+  localStorage.removeItem('lastActivityTime');
+}

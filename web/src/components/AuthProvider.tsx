@@ -5,6 +5,8 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store/useStore';
 import { setupRealtimeSubscription, cleanupRealtimeSubscription } from '@/store/useStore';
+import { useInactivityTimer } from '@/hooks/useInactivityTimer';
+import { clearInactivityData } from '@/lib/dateUtils';
 
 interface AuthContextType {
   user: User | null;
@@ -19,6 +21,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const initializedRef = React.useRef(false);
   const authChangeInProgressRef = React.useRef(false);
 
+  // Initialize inactivity timer for authenticated users
+  useInactivityTimer({
+    enabled: !!user && !loading,
+    onTimeout: async () => {
+      console.log('Inactivity timeout - signing out user');
+      await supabase.auth.signOut();
+    },
+    onWarning: () => {
+      console.log('Inactivity warning triggered');
+    }
+  });
+
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
@@ -28,6 +42,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (session?.user) {
           console.log('Initial session found for user:', session.user.email);
+          // Clear any old inactivity data when user logs in
+          clearInactivityData();
           setUser(session.user);
           setLoading(false);
           initializedRef.current = true;
@@ -79,6 +95,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             if (session?.user) {
               console.log('User authenticated:', session.user.email);
+              // Clear any old inactivity data when user logs in
+              clearInactivityData();
               setUser(session.user);
               setLoading(false);
               

@@ -8,6 +8,8 @@ import { RiSunLine, RiMoonLine, RiWifiOffLine, RiSettings3Line } from 'react-ico
 import Link from 'next/link';
 import { AuthProvider, useAuth } from '@/components/AuthProvider';
 import LogoutButton from '@/components/LogoutButton';
+import InactivitySettings from '@/components/InactivitySettings';
+import InactivityWarning from '@/components/InactivityWarning';
 import Head from 'next/head';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -21,8 +23,6 @@ function RootLayoutContent({
   const { user, loading } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
-  
-  ('RootLayoutContent: user=', user?.email, 'loading=', loading);
 
   useEffect(() => {
     // Theme setup
@@ -130,7 +130,11 @@ function RootLayoutContent({
 
                 {user && (
                   <>
-                    {('Rendering LogoutButton for user:', user.email)}
+                    <div className="hidden sm:flex items-center gap-2 text-sm text-secondary">
+                      <span className="hidden md:inline">Signed in as:</span>
+                      <span className="font-medium text-primary">{user.email}</span>
+                    </div>
+                    <InactivitySettings />
                     <LogoutButton />
                   </>
                 )}
@@ -140,6 +144,7 @@ function RootLayoutContent({
         </nav>
 
         <main>{children}</main>
+        {user && <InactivityWarning />}
       </div>
     </>
   );
