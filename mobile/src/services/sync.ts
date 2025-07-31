@@ -3,8 +3,32 @@ import { storage, JournalEntry, Tag } from './storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { encryptData, decryptData } from '../lib/encryption';
 import * as Linking from 'expo-linking';
+import Constants from 'expo-constants';
 
 export const sync = {
+  async getOAuthRedirectUri() {
+    try {
+      // Use Linking.createURL to get the proper scheme for current environment
+      const linkingUrl = Linking.createURL('auth/callback');
+
+      
+      // Check if it's a development URI (exp:// scheme)
+      if (linkingUrl.startsWith('exp://')) {
+        ('🔄 Development build detected, using mobile scheme for OAuth');
+        
+        // For development, use the production scheme which Google accepts
+        const mobileScheme = 'soulpages://auth/callback';
+        return mobileScheme;
+      }
+      
+      return linkingUrl;
+    } catch (error) {
+      console.error('Error getting OAuth redirect URI:', error);
+      // Fallback to production scheme
+      return 'soulpages://auth/callback';
+    }
+  },
+
   async signIn(email: string, password: string) {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -33,10 +57,13 @@ export const sync = {
 
   async signInWithGoogle() {
     try {
+      // Get the proper redirect URI for the current environment
+      const redirectUri = await this.getOAuthRedirectUri();
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'soulpages://auth/callback',
+          redirectTo: redirectUri,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -61,12 +88,17 @@ export const sync = {
         throw new Error('No OAuth URL received from Supabase');
       }
 
-      // Wait for redirect completion
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // For development builds using Supabase callback, wait longer for OAuth completion
+      const isDevelopment = (await this.getOAuthRedirectUri()).includes('supabase.co');
+      const waitTime = isDevelopment ? 10000 : 5000; // Wait longer for development
+      
+      await new Promise(resolve => setTimeout(resolve, waitTime));
 
       // Try to get the session multiple times
       let session = null;
-      for (let i = 0; i < 3; i++) {
+      const maxRetries = isDevelopment ? 5 : 3; // More retries for development
+      
+      for (let i = 0; i < maxRetries; i++) {
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         
         if (currentSession?.user) {
@@ -136,7 +168,7 @@ export const sync = {
 
         if (checkError || !existingEntry) {
           // Entry doesn't exist on server, treat as new entry
-          console.log(`Entry ${entry.id} not found on server, creating new entry`);
+          (`Entry ${entry.id} not found on server, creating new entry`);
           const { data, error } = await supabase
             .from('journal_entries')
             .insert(supabaseEntry)
@@ -147,7 +179,7 @@ export const sync = {
           result = data;
         } else {
           // Entry exists, update it
-          console.log(`Updating existing entry ${entry.id} on server`);
+          (`Updating existing entry ${entry.id} on server`);
           const { data, error } = await supabase
             .from('journal_entries')
             .update(supabaseEntry)
@@ -192,46 +224,12 @@ export const sync = {
         throw new Error('Not signed in');
       }
 
-      const userId = user.id;
       const localEntries = await storage.getAllEntries();
       
-      // First, fetch all entries from server
-      const { data: serverEntries, error: fetchError } = await supabase
-        .from('journal_entries')
-        .select('*')
-        .eq('user_id', userId)
-        .order('date', { ascending: false });
-
-      if (fetchError) throw fetchError;
-
-      // Create a map of server entries by ID for quick lookup
-      const serverEntriesMap = new Map();
-      serverEntries?.forEach(entry => {
-        serverEntriesMap.set(entry.id, entry);
-      });
-
-      // Upload unsynced local entries to web
+      // Only upload unsynced local entries to web (push-only sync)
       for (const entry of localEntries) {
         if (!entry.synced) {
           await this.syncEntry(entry);
-        }
-      }
-
-      // Download entries that exist on server but not locally
-      for (const serverEntry of serverEntries || []) {
-        const localEntry = localEntries.find(e => e.id === serverEntry.id);
-        if (!localEntry) {
-          // Entry exists on server but not locally - download it
-          await this.downloadEntry(serverEntry);
-        }
-      }
-
-      // Handle orphaned entries (exist locally but not on server)
-      for (const localEntry of localEntries) {
-        if (localEntry.id && localEntry.id.length > 20 && !serverEntriesMap.has(localEntry.id)) {
-          console.log(`Found orphaned entry ${localEntry.id}, marking as unsynced`);
-          // Mark orphaned entry as unsynced so it gets re-created
-          await storage.updateEntry({ ...localEntry, synced: false });
         }
       }
 
@@ -242,34 +240,7 @@ export const sync = {
     }
   },
 
-  async downloadEntry(serverEntry: any) {
-    try {
-      // Decrypt title and content
-      const decryptedTitle = await decryptData(serverEntry.title);
-      const decryptedContent = await decryptData(serverEntry.content);
-      
-      // Convert to local format
-      const localEntry: JournalEntry = {
-        id: serverEntry.id,
-        title: decryptedTitle,
-        content: decryptedContent,
-        date: serverEntry.date,
-        tags: serverEntry.tags || [],
-        synced: true,
-        createdAt: serverEntry.created_at,
-        updatedAt: serverEntry.updated_at,
-        mood: serverEntry.mood,
-      };
 
-      // Save to local storage
-      await storage.saveEntry(localEntry);
-      
-      return localEntry;
-    } catch (error) {
-      console.error('Error downloading entry:', error);
-      throw error;
-    }
-  },
 
 
 

@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth } from '../services/auth';
@@ -35,8 +36,10 @@ export function SettingsScreen({ onChangePIN }: Props) {
   const [password, setPassword] = useState('');
   const [hasCredentials, setHasCredentials] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [themeLoaded, setThemeLoaded] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [userEmail, setUserEmail] = useState('');
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -75,6 +78,7 @@ export function SettingsScreen({ onChangePIN }: Props) {
   const loadTheme = async () => {
     const theme = await storage.getTheme();
     setIsDarkMode(theme === 'dark');
+    setThemeLoaded(true);
   };
 
   const handleThemeChange = async (value: boolean) => {
@@ -165,19 +169,31 @@ export function SettingsScreen({ onChangePIN }: Props) {
     );
   };
 
-  if (isLoading) {
+  if (isLoading || !themeLoaded) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <Text style={styles.loadingText}>Loading settings...</Text>
+      <View style={[styles.container, isDarkMode && styles.darkContainer, { paddingTop: insets.top }]}>
+        <Text style={[styles.loadingText, isDarkMode && styles.darkText]}>Loading settings...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView 
-      style={[styles.container, isDarkMode && styles.darkContainer]}
-      contentContainerStyle={{ paddingTop: insets.top + 16 }}
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
+      enabled={isInputFocused}
     >
+      <ScrollView 
+        style={[styles.container, isDarkMode && styles.darkContainer]}
+        contentContainerStyle={{ 
+          paddingTop: insets.top + 16,
+          paddingBottom: insets.bottom + 32, // Just enough padding for safe area
+          flexGrow: 1
+        }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
       <Text style={[styles.title, isDarkMode && styles.darkText]}>Settings</Text>
 
       <View style={styles.section}>
@@ -292,6 +308,8 @@ export function SettingsScreen({ onChangePIN }: Props) {
                 placeholderTextColor={isDarkMode ? '#666' : '#999'}
                 value={email}
                 onChangeText={setEmail}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => setIsInputFocused(false)}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 editable={!isSaving}
@@ -314,6 +332,8 @@ export function SettingsScreen({ onChangePIN }: Props) {
                 placeholderTextColor={isDarkMode ? '#666' : '#999'}
                 value={password}
                 onChangeText={setPassword}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => setIsInputFocused(false)}
                 secureTextEntry
                 editable={!isSaving}
               />
@@ -439,11 +459,12 @@ export function SettingsScreen({ onChangePIN }: Props) {
         <View style={[styles.card, isDarkMode && styles.darkCard]}>
           <View style={[styles.settingItem, styles.noBorder]}>
             <Text style={[styles.settingTitle, isDarkMode && styles.darkText]}>Version</Text>
-            <Text style={[styles.versionText, isDarkMode && styles.darkSecondaryText]}>1.1.0</Text>
+            <Text style={[styles.versionText, isDarkMode && styles.darkSecondaryText]}>2.0.0</Text>
           </View>
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -614,6 +635,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   signOutButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -622,8 +644,6 @@ const styles = StyleSheet.create({
     borderColor: '#fecaca',
     borderRadius: 12,
     padding: 16,
-    margin: 16,
-    marginTop: 0,
   },
   darkSignOutButton: {
     backgroundColor: '#450a0a',

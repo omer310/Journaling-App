@@ -16,29 +16,42 @@ export function LockProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (
-        appState.current.match(/inactive|background/) &&
-        nextAppState === 'active'
-      ) {
-        // App has come to the foreground
-        console.log('App has come to the foreground');
+      console.log('LockContext: App state change:', appState.current, '->', nextAppState);
+      
+      // More strict locking - lock for ANY transition away from active
+      if (appState.current === 'active' && (nextAppState === 'background' || nextAppState === 'inactive')) {
+        console.log('LockContext: App going to background, locking immediately');
+        setIsLocked(true);
+      }
+      // Additional safety: lock for any unexpected state changes
+      else if (nextAppState !== 'active') {
+        console.log('LockContext: Safety lock for unexpected state:', nextAppState);
+        setIsLocked(true);
+      }
+      // Unlock only when coming back to active from background/inactive
+      else if ((appState.current === 'background' || appState.current === 'inactive') && nextAppState === 'active') {
+        console.log('LockContext: App coming to foreground, checking if locked');
         if (isLocked) {
           // If app was locked, redirect to unlock screen
-          router.replace('/unlock');
+          try {
+            console.log('LockContext: Redirecting to unlock screen');
+            router.replace('/unlock');
+          } catch (error) {
+            console.log('LockContext: Navigation to unlock screen failed or already there:', error);
+          }
         }
-      } else if (
-        appState.current === 'active' &&
-        nextAppState.match(/inactive|background/)
-      ) {
-        // App has gone to the background
-        console.log('App has gone to the background, locking...');
-        setIsLocked(true);
       }
 
       appState.current = nextAppState;
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    // Also lock immediately if app starts in non-active state
+    if (AppState.currentState !== 'active') {
+      console.log('LockContext: App started in non-active state, locking immediately');
+      setIsLocked(true);
+    }
 
     return () => {
       subscription?.remove();

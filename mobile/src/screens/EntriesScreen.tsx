@@ -33,7 +33,7 @@ export function EntriesScreen({ onEditEntry, onNewEntry, onOpenSettings }: Props
   const loadEntries = useCallback(async () => {
     try {
       const allEntries = await storage.getAllEntries();
-      console.log('Loaded entries:', allEntries);
+      ('Loaded entries:', allEntries);
       setEntries(allEntries);
     } catch (error) {
       console.error('Error loading entries:', error);

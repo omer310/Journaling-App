@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 
 export default function SetupScreen() {
   const handleComplete = () => {
-    router.replace('./entries');
+    router.replace('/entries');
   };
 
   return <SetupPINScreen onComplete={handleComplete} />;

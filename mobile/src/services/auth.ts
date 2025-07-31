@@ -21,7 +21,7 @@ export const auth = {
       const installId = await AsyncStorage.getItem(APP_INSTALL_KEY);
       if (!installId) {
         // This is a fresh install, clear everything
-        console.log('Fresh install detected, clearing all data...');
+        ('Fresh install detected, clearing all data...');
         await this.clearAllData();
         // Generate and save a new install ID
         await AsyncStorage.setItem(APP_INSTALL_KEY, Date.now().toString());
@@ -49,7 +49,7 @@ export const auth = {
       // Mark first launch as complete
       await SecureStore.setItemAsync(FIRST_LAUNCH_KEY, 'true');
       
-      console.log('PIN set successfully');
+      ('PIN set successfully');
       return true;
     } catch (error) {
       console.error('Error setting PIN:', error);
@@ -65,13 +65,12 @@ export const auth = {
       const firstLaunch = await SecureStore.getItemAsync(FIRST_LAUNCH_KEY);
       
       if (!firstLaunch) {
-        console.log('First launch detected, clearing all data...');
+        ('First launch detected, clearing all data...');
         await this.clearAllData();
         return null;
       }
       
       const pin = await SecureStore.getItemAsync(PIN_KEY);
-      console.log('Retrieved PIN:', pin ? 'exists' : 'not found');
       return pin;
     } catch (error) {
       console.error('Error getting PIN:', error);
@@ -90,7 +89,7 @@ export const auth = {
       const keysToRemove = asyncKeys.filter(key => key !== APP_INSTALL_KEY);
       await AsyncStorage.multiRemove(keysToRemove);
       
-      console.log('All secure data cleared successfully');
+      ('All secure data cleared successfully');
       return true;
     } catch (error) {
       console.error('Error clearing data:', error);
@@ -102,7 +101,6 @@ export const auth = {
     try {
       const storedPin = await SecureStore.getItemAsync(PIN_KEY);
       const isValid = storedPin === pin;
-      console.log('PIN verification:', isValid ? 'successful' : 'failed');
       return isValid;
     } catch (error) {
       console.error('Error verifying PIN:', error);
@@ -282,24 +280,6 @@ export const auth = {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
       const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
-      
-      // Debug logging to see what's being detected
-      console.log('Biometric detection:', {
-        hasHardware,
-        isEnrolled,
-        supportedTypes: supportedTypes.map(type => {
-          switch(type) {
-            case LocalAuthentication.AuthenticationType.FINGERPRINT:
-              return 'FINGERPRINT';
-            case LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION:
-              return 'FACIAL_RECOGNITION';
-            case LocalAuthentication.AuthenticationType.IRIS:
-              return 'IRIS';
-            default:
-              return 'UNKNOWN';
-          }
-        })
-      });
       
       let biometryType = 'Biometrics';
       

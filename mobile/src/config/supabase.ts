@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createClient } from "@supabase/supabase-js";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
@@ -24,7 +24,7 @@ export type Database = {
           date: string;
           tags: string[];
           user_id: string;
-          source: 'web' | 'mobile';
+          source: "web" | "mobile";
           last_modified: string;
           mood: string | null;
           created_at: string;
@@ -37,7 +37,7 @@ export type Database = {
           date?: string;
           tags?: string[];
           user_id: string;
-          source?: 'web' | 'mobile';
+          source?: "web" | "mobile";
           last_modified?: string;
           mood?: string | null;
           created_at?: string;
@@ -50,7 +50,7 @@ export type Database = {
           date?: string;
           tags?: string[];
           user_id?: string;
-          source?: 'web' | 'mobile';
+          source?: "web" | "mobile";
           last_modified?: string;
           mood?: string | null;
           created_at?: string;
@@ -59,4 +59,4 @@ export type Database = {
       };
     };
   };
-}; 
+};

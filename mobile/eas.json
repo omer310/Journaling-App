@@ -9,7 +9,10 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "cache": {
+        "key": "preview-$(hash app.json)"
+      }
     },
     "production": {
       "autoIncrement": true

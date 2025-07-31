@@ -2,22 +2,36 @@
   "expo": {
     "name": "Soul Pages",
     "slug": "mobile",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "soulpages",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
+    "statusBar": {
+      "style": "light",
+      "backgroundColor": "#1a1a1a",
+      "translucent": false
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.omer310.soulpages"
+      "bundleIdentifier": "com.omer310.soulpages",
+      "statusBar": {
+        "barStyle": "light-content",
+        "backgroundColor": "#1a1a1a"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.omer310.soulpages"
+      "package": "com.omer310.soulpages",
+      "statusBar": {
+        "barStyle": "light-content",
+        "backgroundColor": "#1a1a1a",
+        "translucent": false
+      }
     },
     "web": {
       "bundler": "metro",
