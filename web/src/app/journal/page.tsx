@@ -145,9 +145,17 @@ export default function EnhancedJournalPage() {
     return "px-3 py-1 text-sm";                      // Normal for short streaks
   };
 
+  // Helper to strip HTML tags robustly
+  function stripHtmlTags(html: string): string {
+    if (typeof window === 'undefined') return html; // SSR safety
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return div.textContent || div.innerText || '';
+  }
+
   // Calculate word count
   useEffect(() => {
-    const text = content.replace(/<[^>]*>/g, ''); // Strip HTML
+    const text = stripHtmlTags(content); // Robustly strip HTML
     const words = text.split(/\s+/).filter(word => word.length > 0);
     setWordCount(words.length);
   }, [content]);
