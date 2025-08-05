@@ -1,121 +1,97 @@
-'use client';
+"use client";
 
-import './globals.css';
-import { Inter } from 'next/font/google';
-import { useStore } from '@/store/useStore';
-import { useEffect, useState } from 'react';
-import { RiSunLine, RiMoonLine, RiWifiOffLine, RiSettings3Line, RiText } from 'react-icons/ri';
-import Link from 'next/link';
-import { AuthProvider, useAuth } from '@/components/AuthProvider';
-import LogoutButton from '@/components/LogoutButton';
-import InactivitySettings from '@/components/InactivitySettings';
-import InactivityWarning from '@/components/InactivityWarning';
-import Head from 'next/head';
+import "./globals.css";
+import { Inter } from "next/font/google";
+import { useStore } from "@/store/useStore";
+import { useEffect, useState, useRef } from "react";
+import { RiWifiOffLine } from "react-icons/ri";
+import Link from "next/link";
+import { AuthProvider, useAuth } from "@/components/AuthProvider";
+import LogoutButton from "@/components/LogoutButton";
+import InactivitySettings from "@/components/InactivitySettings";
+import InactivityWarning from "@/components/InactivityWarning";
+import Head from "next/head";
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ["latin"] });
 
-function RootLayoutContent({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const { currentTheme, setTheme, isOffline, setOfflineStatus, cleanupCorruptedEntries } = useStore();
-  const { user, loading } = useAuth();
-  const [showSettings, setShowSettings] = useState(false);
-  const [isCleaning, setIsCleaning] = useState(false);
+function RootLayoutContent({ children }: { children: React.ReactNode }) {
+  const { isOffline, setOfflineStatus } = useStore();
+  const { user } = useAuth();
+  const fontSelectorRef = useRef<HTMLDivElement>(null);
   const [showFontSelector, setShowFontSelector] = useState(false);
   const [selectedFont, setSelectedFont] = useState(() => {
     // Try to get saved font from localStorage
-    if (typeof window !== 'undefined') {
-      const savedFont = localStorage.getItem('soul-pages-font');
-      return savedFont || 'Indie Flower';
+    if (typeof window !== "undefined") {
+      const savedFont = localStorage.getItem("soul-pages-font");
+      return savedFont || "Indie Flower";
     }
-    return 'Indie Flower';
+    return "Indie Flower";
   });
 
   useEffect(() => {
-    // Theme setup
-    const root = document.documentElement;
-    
-    // Set initial theme
-    if (currentTheme === 'dark') {
-      root.classList.add('dark');
-    } else if (currentTheme === 'light') {
-      root.classList.remove('dark');
-    } else if (currentTheme === 'system') {
-      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      systemDark ? root.classList.add('dark') : root.classList.remove('dark');
-    }
-
-    // Handle system theme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleThemeChange = (e: MediaQueryListEvent) => {
-      if (currentTheme === 'system') {
-        e.matches ? root.classList.add('dark') : root.classList.remove('dark');
+    // Handle click outside to close dropdown
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        fontSelectorRef.current &&
+        !fontSelectorRef.current.contains(event.target as Node)
+      ) {
+        setShowFontSelector(false);
       }
     };
 
-    mediaQuery.addEventListener('change', handleThemeChange);
-    return () => mediaQuery.removeEventListener('change', handleThemeChange);
-  }, [currentTheme]);
+    if (showFontSelector) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showFontSelector]);
 
   useEffect(() => {
     // Offline detection
     const handleOnline = () => setOfflineStatus(false);
     const handleOffline = () => setOfflineStatus(true);
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, [setOfflineStatus]);
 
-  useEffect(() => {
-    // Close dropdowns when clicking outside
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      if (!target.closest('.settings-dropdown')) {
-        setShowSettings(false);
-      }
-      if (!target.closest('.font-selector-dropdown')) {
-        setShowFontSelector(false);
-      }
-    };
-
-    if (showSettings || showFontSelector) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showSettings, showFontSelector]);
-
   // Apply selected font on component mount and save to localStorage
   useEffect(() => {
-    document.documentElement.style.setProperty('--app-font', selectedFont);
+    document.documentElement.style.setProperty("--app-font", selectedFont);
     // Save font preference to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('soul-pages-font', selectedFont);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("soul-pages-font", selectedFont);
     }
   }, [selectedFont]);
 
   // Font options with their display names
   const fontOptions = [
-    { name: 'Indie Flower', display: 'Indie Flower', style: 'font-handwriting' },
-    { name: 'Inter', display: 'Inter', style: 'font-sans' },
-    { name: 'Georgia', display: 'Georgia', style: 'font-serif' },
-    { name: 'Courier New', display: 'Courier New', style: 'font-mono' },
-    { name: 'Arial', display: 'Arial', style: 'font-sans' },
-    { name: 'Times New Roman', display: 'Times New Roman', style: 'font-serif' },
-    { name: 'Verdana', display: 'Verdana', style: 'font-sans' },
-    { name: 'Trebuchet MS', display: 'Trebuchet MS', style: 'font-sans' },
-    { name: 'Garamond', display: 'Garamond', style: 'font-serif' },
-    { name: 'Bookman', display: 'Bookman', style: 'font-serif' },
-    { name: 'Comic Sans MS', display: 'Comic Sans MS', style: 'font-sans' },
+    {
+      name: "Indie Flower",
+      display: "Indie Flower",
+      style: "font-handwriting",
+    },
+    { name: "Inter", display: "Inter", style: "font-sans" },
+    { name: "Georgia", display: "Georgia", style: "font-serif" },
+    { name: "Courier New", display: "Courier New", style: "font-mono" },
+    { name: "Arial", display: "Arial", style: "font-sans" },
+    {
+      name: "Times New Roman",
+      display: "Times New Roman",
+      style: "font-serif",
+    },
+    { name: "Verdana", display: "Verdana", style: "font-sans" },
+    { name: "Trebuchet MS", display: "Trebuchet MS", style: "font-sans" },
+    { name: "Garamond", display: "Garamond", style: "font-serif" },
+    { name: "Bookman", display: "Bookman", style: "font-serif" },
+    { name: "Comic Sans MS", display: "Comic Sans MS", style: "font-sans" },
   ];
 
   return (
@@ -164,62 +140,80 @@ function RootLayoutContent({
                   </div>
                 )}
 
-                                {user && (
+                {user && (
                   <>
-                                         {/* Font Selector */}
-                     <div className="relative font-selector-dropdown">
-                       <button
-                         onClick={() => setShowFontSelector(!showFontSelector)}
-                         className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                         title="Change font"
-                       >
-                                                   <span className="text-sm font-medium text-secondary">
-                            Font: <span style={{ fontFamily: selectedFont }}>{selectedFont}</span>
+                    {/* Font Selector */}
+
+                    <div
+                      className="relative font-selector-dropdown"
+                      ref={fontSelectorRef}
+                    >
+                      <button
+                        onClick={() => {
+                          setShowFontSelector(!showFontSelector);
+                        }}
+                        className="hover:text-green-400 transition-colors duration-300 cursor-pointer"
+                        title="Change font"
+                      >
+                        <span className="text-sm font-medium text-secondary hover:text-[#008C5E] transition-colors duration-300 cursor-pointer">
+                          Font:{" "}
+                          <span style={{ fontFamily: selectedFont }}>
+                            {selectedFont}
                           </span>
-                       </button>
-                      
-                                             {showFontSelector && (
-                         <div className="absolute right-0 top-12 bg-surface border border-border rounded-xl shadow-2xl p-2 min-w-[200px] max-h-[300px] overflow-y-auto scrollbar-hide">
-                                                       <div className="px-3 py-2 text-xs font-medium text-text-secondary border-b border-border mb-2">
-                              Current: <span style={{ fontFamily: selectedFont }}>{selectedFont}</span>
-                            </div>
-                           {fontOptions.map(font => (
-                             <button
-                               key={font.name}
-                               onClick={() => {
-                                 setSelectedFont(font.name);
-                                 setShowFontSelector(false);
-                                 // Apply font to the app
-                                 document.documentElement.style.setProperty('--app-font', font.name);
-                               }}
-                                                               className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
-                                  selectedFont === font.name 
-                                    ? 'bg-primary text-white shadow-sm' 
-                                    : 'hover:bg-surface-hover hover:text-primary text-text-primary hover:shadow-sm'
-                                }`}
-                               style={{ fontFamily: font.name }}
-                             >
-                               {font.display}
-                             </button>
-                           ))}
-                         </div>
-                       )}
+                        </span>
+                      </button>
+
+                      {showFontSelector && (
+                        <div className="absolute right-0 top-12 bg-surface border border-border rounded-xl shadow-2xl p-2 min-w-[200px] max-h-[300px] overflow-y-auto scrollbar-hide">
+                          <div className="px-3 py-2 text-xs font-medium text-text-secondary border-b border-border mb-2">
+                            Current:{" "}
+                            <span style={{ fontFamily: selectedFont }}>
+                              {selectedFont}
+                            </span>
+                          </div>
+                          {fontOptions.map((font) => (
+                            <button
+                              key={font.name}
+                              onClick={() => {
+                                setSelectedFont(font.name);
+                                setShowFontSelector(false);
+                                // Apply font to the app
+                                document.documentElement.style.setProperty(
+                                  "--app-font",
+                                  font.name,
+                                );
+                              }}
+                              className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
+                                selectedFont === font.name
+                                  ? "bg-primary text-white shadow-sm"
+                                  : "hover:bg-surface-hover hover:text-primary text-text-primary hover:shadow-sm"
+                              }`}
+                              style={{ fontFamily: font.name }}
+                            >
+                              {font.display}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="hidden sm:flex items-center gap-2 text-sm text-secondary">
                       <span className="hidden md:inline">Signed in as:</span>
-                                              <span className="font-medium text-primary">
-                          {user.email ? 
-                            user.email.split('@')[0]
-                              .replace(/[0-9]/g, '')
-                              .replace(/^[^a-zA-Z]*/, '')
-                              .charAt(0).toUpperCase() + 
-                            user.email.split('@')[0]
-                              .replace(/[0-9]/g, '')
-                              .replace(/^[^a-zA-Z]*/, '')
-                              .slice(1) || 'User'
-                          : 'User'}
-                        </span>
+                      <span className="font-medium text-primary">
+                        {user.email
+                          ? user.email
+                              .split("@")[0]
+                              .replace(/[0-9]/g, "")
+                              .replace(/^[^a-zA-Z]*/, "")
+                              .charAt(0)
+                              .toUpperCase() +
+                              user.email
+                                .split("@")[0]
+                                .replace(/[0-9]/g, "")
+                                .replace(/^[^a-zA-Z]*/, "")
+                                .slice(1) || "User"
+                          : "User"}
+                      </span>
                     </div>
                     <InactivitySettings />
                     <LogoutButton />
@@ -243,50 +237,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  // Read theme from localStorage
-                  const stored = localStorage.getItem('soul-pages-storage');
-                  if (stored) {
-                    const data = JSON.parse(stored);
-                    const theme = data.state?.currentTheme || 'system';
-                    
-                    // Apply theme immediately
-                    const root = document.documentElement;
-                    if (theme === 'dark') {
-                      root.classList.add('dark');
-                    } else if (theme === 'light') {
-                      root.classList.remove('dark');
-                    } else if (theme === 'system') {
-                      // Check system preference
-                      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                      if (systemDark) {
-                        root.classList.add('dark');
-                      } else {
-                        root.classList.remove('dark');
-                      }
-                    }
-                  } else {
-                    // Default to system preference if no stored theme
-                    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    if (systemDark) {
-                      document.documentElement.classList.add('dark');
-                    }
-                  }
-                } catch (e) {
-                  // Silently handle any errors
-                }
-              })();
-            `,
-          }}
-        />
-      </head>
-      <body suppressHydrationWarning>
+    <html lang="en">
+      <body>
         <AuthProvider>
           <RootLayoutContent>{children}</RootLayoutContent>
         </AuthProvider>
