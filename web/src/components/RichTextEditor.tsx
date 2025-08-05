@@ -47,6 +47,7 @@ interface RichTextEditorProps {
   onChange: (content: string) => void;
   placeholder?: string;
   autosave?: boolean;
+  fontFamily?: string;
 }
 
 const AUTOSAVE_DELAY = 1000;
@@ -71,6 +72,7 @@ export function RichTextEditor({
   onChange,
   placeholder = 'Write your thoughts here...',
   autosave = true,
+  fontFamily,
 }: RichTextEditorProps): React.ReactElement | null {
   // Use speech recognition only if available
   const speechRecognitionResult = useSpeechRecognition ? useSpeechRecognition({
@@ -117,7 +119,8 @@ export function RichTextEditor({
     editorProps: {
       attributes: {
         class: 'editor-content prose dark:prose-invert max-w-none focus:outline-none',
-        dir: 'auto',
+        dir: 'ltr',
+        style: `font-family: ${fontFamily || 'var(--app-font, Inter)'}, system-ui, sans-serif;`,
       },
       handleDOMEvents: {
         input: (view, event) => {
@@ -151,8 +154,8 @@ export function RichTextEditor({
   // Insert transcript into editor when it changes
   useEffect(() => {
     if (editor && (finalTranscript || interimTranscript)) {
-      ('Final transcript:', finalTranscript);
-      ('Interim transcript:', interimTranscript);
+      console.log('Final transcript:', finalTranscript);
+      console.log('Interim transcript:', interimTranscript);
       editor.commands.focus();
       if (finalTranscript) {
         editor.commands.insertContent(finalTranscript + ' ');
@@ -165,7 +168,7 @@ export function RichTextEditor({
     if (!editor || !autosave) return;
 
     const timer = setTimeout(() => {
-      ('Autosaving...', editor.getHTML());
+      console.log('Autosaving...', editor.getHTML());
     }, AUTOSAVE_DELAY);
 
     return () => clearTimeout(timer);
@@ -194,10 +197,8 @@ export function RichTextEditor({
     }
 
     if (listening) {
-      ('Stopping speech recognition');
       SpeechRecognition.stopListening();
     } else {
-      ('Starting speech recognition');
       try {
         // Focus the editor before starting speech recognition
         editor?.commands.focus();

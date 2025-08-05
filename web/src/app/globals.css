@@ -98,7 +98,21 @@ html:not(.dark) {
   font-family: var(--font-arabic) !important;
   font-size: 1.4rem !important;
   line-height: 1.8 !important;
-  letter-spacing: 0 !important;
+}
+
+/* Hide scrollbar for webkit browsers */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
+}
+
+/* Apply selected font to the app */
+:root {
+  --app-font: 'Indie Flower', cursive, system-ui, sans-serif;
 }
 
 /* Theme transition - apply to most elements but not body to avoid conflicts */
@@ -181,5 +195,212 @@ html:not(.dark) {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
+/* Streak glow animation */
+@keyframes glow {
+  0% {
+    box-shadow: 0 0 5px rgba(0, 159, 107, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 20px rgba(0, 159, 107, 0.8), 0 0 30px rgba(0, 159, 107, 0.4);
+  }
+}
+
+/* Realistic flame animations */
+.flame-container {
+  position: relative;
+  width: 20px;
+  height: 24px;
+  display: inline-block;
+}
+
+/* Base flame structure - colors will be set dynamically */
+.flame-base {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 12px;
+  border-radius: 50% 50% 12px 12px;
+  animation: fire-base-flicker 0.8s ease-in-out infinite alternate;
+}
+
+.flame-left {
+  position: absolute;
+  bottom: 6px;
+  left: 20%;
+  width: 7px;
+  height: 15px;
+  border-radius: 50% 50% 80% 20% / 60% 60% 40% 40%;
+  transform: rotate(-15deg);
+  animation: left-flame-dance 0.7s ease-in-out infinite alternate;
+}
+
+.flame-center {
+  position: absolute;
+  bottom: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 18px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  animation: center-flame-dance 0.6s ease-in-out infinite alternate;
+  z-index: 2;
+}
+
+.flame-right {
+  position: absolute;
+  bottom: 5px;
+  right: 15%;
+  width: 8px;
+  height: 14px;
+  border-radius: 50% 50% 20% 80% / 60% 60% 40% 40%;
+  transform: rotate(20deg);
+  animation: right-flame-dance 0.9s ease-in-out infinite alternate;
+}
+
+.flame-glow {
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 9px;
+  border-radius: 50%;
+  z-index: 3;
+}
+
+/* Flame animation keyframes */
+@keyframes fire-base-flicker {
+  0% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(-50%) scale(1.05, 0.95);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateX(-50%) scale(0.98, 1.02);
+    opacity: 0.95;
+  }
+}
+
+@keyframes left-flame-dance {
+  0% {
+    transform: rotate(-15deg) scale(1) skewX(0deg);
+    opacity: 0.9;
+  }
+  30% {
+    transform: rotate(-20deg) scale(1.05, 0.95) skewX(-2deg);
+    opacity: 0.8;
+  }
+  70% {
+    transform: rotate(-10deg) scale(0.95, 1.05) skewX(1deg);
+    opacity: 0.85;
+  }
+  100% {
+    transform: rotate(-18deg) scale(1.02, 0.98) skewX(-1deg);
+    opacity: 0.9;
+  }
+}
+
+@keyframes center-flame-dance {
+  0% {
+    transform: translateX(-50%) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  25% {
+    transform: translateX(-50%) scale(1.08, 0.92) rotate(-1deg);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translateX(-50%) scale(0.92, 1.08) rotate(1deg);
+    opacity: 0.95;
+  }
+  75% {
+    transform: translateX(-50%) scale(1.04, 0.96) rotate(-0.5deg);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateX(-50%) scale(0.96, 1.04) rotate(0.5deg);
+    opacity: 0.9;
+  }
+}
+
+@keyframes right-flame-dance {
+  0% {
+    transform: rotate(20deg) scale(1) skewX(0deg);
+    opacity: 0.88;
+  }
+  40% {
+    transform: rotate(25deg) scale(1.03, 0.97) skewX(2deg);
+    opacity: 0.82;
+  }
+  80% {
+    transform: rotate(15deg) scale(0.97, 1.03) skewX(-1deg);
+    opacity: 0.86;
+  }
+  100% {
+    transform: rotate(22deg) scale(1.01, 0.99) skewX(1deg);
+    opacity: 0.88;
+  }
+}
+
+@keyframes inner-glow {
+  0% {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(-50%) scale(1.2, 0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(-50%) scale(0.8, 1.2);
+    opacity: 0.9;
+  }
+}
+
+/* Legacy animations for fallback */
+@keyframes flame-flicker {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1) hue-rotate(0deg);
+  }
+  25% {
+    transform: scale(1.1) rotate(1deg);
+    filter: brightness(1.2) hue-rotate(5deg);
+  }
+  50% {
+    transform: scale(0.95) rotate(-1deg);
+    filter: brightness(0.9) hue-rotate(-3deg);
+  }
+  75% {
+    transform: scale(1.05) rotate(0.5deg);
+    filter: brightness(1.1) hue-rotate(2deg);
+  }
+}
+
+@keyframes flame-bounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.05);
+  }
+}
+
+@keyframes flame-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
 }
 

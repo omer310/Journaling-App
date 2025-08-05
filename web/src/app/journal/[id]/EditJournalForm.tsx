@@ -16,7 +16,7 @@ export default function EditJournalForm({ id }: { id: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const { entries, tags, updateEntry, addTag } = useStore();
+  const { entries, tags, updateEntry, addTag, removeTag } = useStore();
 
   // Load entry data
   useEffect(() => {
@@ -124,6 +124,7 @@ export default function EditJournalForm({ id }: { id: string }) {
               availableTags={tags}
               onTagSelect={(tagId) => setSelectedTags([...selectedTags, tagId])}
               onTagRemove={(tagId) => setSelectedTags(selectedTags.filter(id => id !== tagId))}
+              onTagDelete={(tagId) => removeTag(tagId)}
               onTagCreate={handleCreateTag}
             />
 

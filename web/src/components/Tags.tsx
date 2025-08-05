@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { RiAddLine, RiCloseLine } from 'react-icons/ri';
+import { RiAddLine, RiCloseLine, RiSubtractLine } from 'react-icons/ri';
 
 interface Tag {
   id: string;
@@ -14,6 +14,7 @@ interface TagsProps {
   availableTags: Tag[];
   onTagSelect: (tagId: string) => void;
   onTagRemove: (tagId: string) => void;
+  onTagDelete?: (tagId: string) => void;
   onTagCreate?: (tagName: string) => void;
   className?: string;
 }
@@ -23,6 +24,7 @@ export function Tags({
   availableTags,
   onTagSelect,
   onTagRemove,
+  onTagDelete,
   onTagCreate,
   className = '',
 }: TagsProps) {
@@ -73,8 +75,9 @@ export function Tags({
               <button
                 onClick={() => onTagRemove(tag.id)}
                 className="h-full px-2 bg-[#2a2a2a] hover:bg-[#333] rounded-r-full text-[#666] hover:text-red-500 transition-colors duration-200"
+                title="Remove tag from this entry"
               >
-                <RiCloseLine className="w-4 h-4" />
+                <RiSubtractLine className="w-4 h-4" />
               </button>
             </span>
           );
@@ -138,9 +141,9 @@ export function Tags({
                   {tag.name}
                 </button>
                 <button
-                  onClick={() => onTagRemove(tag.id)}
+                  onClick={() => onTagDelete?.(tag.id)}
                   className="h-full px-2 bg-[#2a2a2a] hover:bg-[#333] rounded-r-full text-[#666] hover:text-red-500 transition-colors duration-200"
-                  title="Delete tag"
+                  title="Delete tag permanently"
                 >
                   <RiCloseLine className="w-4 h-4" />
                 </button>

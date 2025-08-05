@@ -4,7 +4,7 @@ import './globals.css';
 import { Inter } from 'next/font/google';
 import { useStore } from '@/store/useStore';
 import { useEffect, useState } from 'react';
-import { RiSunLine, RiMoonLine, RiWifiOffLine, RiSettings3Line } from 'react-icons/ri';
+import { RiSunLine, RiMoonLine, RiWifiOffLine, RiSettings3Line, RiText } from 'react-icons/ri';
 import Link from 'next/link';
 import { AuthProvider, useAuth } from '@/components/AuthProvider';
 import LogoutButton from '@/components/LogoutButton';
@@ -23,6 +23,15 @@ function RootLayoutContent({
   const { user, loading } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
+  const [showFontSelector, setShowFontSelector] = useState(false);
+  const [selectedFont, setSelectedFont] = useState(() => {
+    // Try to get saved font from localStorage
+    if (typeof window !== 'undefined') {
+      const savedFont = localStorage.getItem('soul-pages-font');
+      return savedFont || 'Indie Flower';
+    }
+    return 'Indie Flower';
+  });
 
   useEffect(() => {
     // Theme setup
@@ -65,22 +74,49 @@ function RootLayoutContent({
   }, [setOfflineStatus]);
 
   useEffect(() => {
-    // Close settings dropdown when clicking outside
+    // Close dropdowns when clicking outside
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
       if (!target.closest('.settings-dropdown')) {
         setShowSettings(false);
       }
+      if (!target.closest('.font-selector-dropdown')) {
+        setShowFontSelector(false);
+      }
     };
 
-    if (showSettings) {
+    if (showSettings || showFontSelector) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showSettings]);
+  }, [showSettings, showFontSelector]);
+
+  // Apply selected font on component mount and save to localStorage
+  useEffect(() => {
+    document.documentElement.style.setProperty('--app-font', selectedFont);
+    // Save font preference to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('soul-pages-font', selectedFont);
+    }
+  }, [selectedFont]);
+
+  // Font options with their display names
+  const fontOptions = [
+    { name: 'Indie Flower', display: 'Indie Flower', style: 'font-handwriting' },
+    { name: 'Inter', display: 'Inter', style: 'font-sans' },
+    { name: 'Georgia', display: 'Georgia', style: 'font-serif' },
+    { name: 'Courier New', display: 'Courier New', style: 'font-mono' },
+    { name: 'Arial', display: 'Arial', style: 'font-sans' },
+    { name: 'Times New Roman', display: 'Times New Roman', style: 'font-serif' },
+    { name: 'Verdana', display: 'Verdana', style: 'font-sans' },
+    { name: 'Trebuchet MS', display: 'Trebuchet MS', style: 'font-sans' },
+    { name: 'Garamond', display: 'Garamond', style: 'font-serif' },
+    { name: 'Bookman', display: 'Bookman', style: 'font-serif' },
+    { name: 'Comic Sans MS', display: 'Comic Sans MS', style: 'font-sans' },
+  ];
 
   return (
     <>
@@ -128,11 +164,62 @@ function RootLayoutContent({
                   </div>
                 )}
 
-                {user && (
+                                {user && (
                   <>
+                                         {/* Font Selector */}
+                     <div className="relative font-selector-dropdown">
+                       <button
+                         onClick={() => setShowFontSelector(!showFontSelector)}
+                         className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                         title="Change font"
+                       >
+                                                   <span className="text-sm font-medium text-secondary">
+                            Font: <span style={{ fontFamily: selectedFont }}>{selectedFont}</span>
+                          </span>
+                       </button>
+                      
+                                             {showFontSelector && (
+                         <div className="absolute right-0 top-12 bg-surface border border-border rounded-xl shadow-2xl p-2 min-w-[200px] max-h-[300px] overflow-y-auto scrollbar-hide">
+                                                       <div className="px-3 py-2 text-xs font-medium text-text-secondary border-b border-border mb-2">
+                              Current: <span style={{ fontFamily: selectedFont }}>{selectedFont}</span>
+                            </div>
+                           {fontOptions.map(font => (
+                             <button
+                               key={font.name}
+                               onClick={() => {
+                                 setSelectedFont(font.name);
+                                 setShowFontSelector(false);
+                                 // Apply font to the app
+                                 document.documentElement.style.setProperty('--app-font', font.name);
+                               }}
+                                                               className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
+                                  selectedFont === font.name 
+                                    ? 'bg-primary text-white shadow-sm' 
+                                    : 'hover:bg-surface-hover hover:text-primary text-text-primary hover:shadow-sm'
+                                }`}
+                               style={{ fontFamily: font.name }}
+                             >
+                               {font.display}
+                             </button>
+                           ))}
+                         </div>
+                       )}
+                    </div>
+
                     <div className="hidden sm:flex items-center gap-2 text-sm text-secondary">
                       <span className="hidden md:inline">Signed in as:</span>
-                      <span className="font-medium text-primary">{user.email}</span>
+                                              <span className="font-medium text-primary">
+                          {user.email ? 
+                            user.email.split('@')[0]
+                              .replace(/[0-9]/g, '')
+                              .replace(/^[^a-zA-Z]*/, '')
+                              .charAt(0).toUpperCase() + 
+                            user.email.split('@')[0]
+                              .replace(/[0-9]/g, '')
+                              .replace(/^[^a-zA-Z]*/, '')
+                              .slice(1) || 'User'
+                          : 'User'}
+                        </span>
                     </div>
                     <InactivitySettings />
                     <LogoutButton />

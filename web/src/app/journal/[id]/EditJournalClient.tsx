@@ -33,12 +33,13 @@ function getTagsArray(tags: any): string[] {
 
 export function EditJournalClient({ params }: EditJournalClientProps) {
   const router = useRouter();
-  const { entries, tags, updateEntry, addTag } = useStore();
+  const { entries, tags, updateEntry, addTag, removeTag, fetchEntries } = useStore();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [entryDate, setEntryDate] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [mood, setMood] = useState<'happy' | 'neutral' | 'sad' | undefined>(undefined);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,11 +61,15 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
     // First, try to find the entry in the store
     const entry = entries.find((e) => e.id === params.id);
     if (entry) {
-      console.log('Found entry in store:', entry);
+      console.log('🏷️ LOAD DEBUG - Found entry in store:', entry);
+      console.log('🏷️ LOAD DEBUG - Entry tags raw:', entry.tags);
+      console.log('🏷️ LOAD DEBUG - Available tags:', tags);
+      const entryTags = getTagsArray(entry.tags);
+      console.log('🏷️ LOAD DEBUG - Parsed entry tags:', entryTags);
       setTitle(entry.title);
       setContent(entry.content);
       setEntryDate(entry.date || '');
-      setSelectedTags(getTagsArray(entry.tags));
+      setSelectedTags(entryTags);
       setMood(entry.mood);
       setLoading(false);
       return;
@@ -93,11 +98,15 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
           return;
         }
 
-        console.log('Found entry in Supabase:', entry);
+        console.log('🏷️ LOAD DEBUG - Found entry in Supabase:', entry);
+        console.log('🏷️ LOAD DEBUG - Supabase entry tags raw:', entry.tags);
+        console.log('🏷️ LOAD DEBUG - Available tags:', tags);
+        const entryTags = getTagsArray(entry.tags);
+        console.log('🏷️ LOAD DEBUG - Parsed Supabase entry tags:', entryTags);
         setTitle(entry.title || '');
         setContent(entry.content || '');
         setEntryDate(entry.date || '');
-        setSelectedTags(getTagsArray(entry.tags));
+        setSelectedTags(entryTags);
         setMood(entry.mood);
         setLoading(false);
       } catch (error) {
@@ -110,19 +119,35 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
     fetchEntry();
   }, [entries, params.id, router, retryCount]);
 
+  // Debug selectedTags state changes
+  useEffect(() => {
+    console.log('🏷️ STATE DEBUG - Selected tags changed to:', selectedTags);
+  }, [selectedTags]);
+
   const handleSave = async () => {
     if (!title.trim() || !content.trim()) return;
 
     setSaving(true);
     try {
-      await updateEntry(params.id, {
+      console.log('🏷️ SAVE DEBUG - Selected tags before save:', selectedTags);
+      console.log('🏷️ SAVE DEBUG - Available tags for reference:', tags);
+      console.log('🏷️ SAVE DEBUG - Entry data being saved:', {
         title: title.trim(),
         content: content.trim(),
         date: entryDate,
         tags: selectedTags,
         mood,
       });
+      
+      await updateEntry(params.id, {
+        title: title.trim(),
+        content: content.trim(),
+        date: entryDate,
+        tags: selectedTags,
+        mood,
+      } as any);
 
+      console.log('🏷️ SAVE DEBUG - Save completed successfully');
       router.push('/entries');
     } catch (error) {
       console.error('Failed to save entry:', error);
@@ -172,12 +197,15 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
             <div className="flex items-center justify-between">
               <h1 className="text-3xl font-bold text-primary">Edit Journal Entry</h1>
               <div className="flex gap-2">
-                <button
-                  onClick={() => router.push('/entries')}
-                  className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
-                >
-                  Cancel
-                </button>
+                                 <button
+                   onClick={() => {
+                     console.log('🏷️ CANCEL DEBUG - Going back without refreshing (preserving original data)');
+                     router.push('/entries');
+                   }}
+                   className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
+                 >
+                   Cancel
+                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saving || !title.trim() || !content.trim()}
@@ -188,68 +216,77 @@ export function EditJournalClient({ params }: EditJournalClientProps) {
               </div>
             </div>
 
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-surface border border-border rounded-md text-primary focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Enter title..."
-                />
-              </div>
+                         <div className="space-y-6">
+               <div>
+                 <label className="block text-sm font-medium text-primary mb-2">
+                   Title
+                 </label>
+                 <input
+                   type="text"
+                   value={title}
+                   onChange={(e) => setTitle(e.target.value)}
+                   className="w-full px-3 py-2 bg-surface border border-border rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                   placeholder="Enter title..."
+                 />
+               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">
-                  Entry Date & Time
-                </label>
-                <input
-                  type="datetime-local"
-                  value={entryDate}
-                  onChange={(e) => setEntryDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-surface border border-border rounded-md text-primary focus:outline-none focus:ring-2 focus:ring-primary [&::-webkit-calendar-picker-indicator]:bg-primary [&::-webkit-calendar-picker-indicator]:rounded [&::-webkit-calendar-picker-indicator]:p-1 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:hover:bg-primary/80 [&::-webkit-datetime-edit]:text-primary [&::-webkit-datetime-edit-fields-wrapper]:text-primary [&::-webkit-datetime-edit-text]:text-primary [&::-webkit-datetime-edit-month-field]:text-primary [&::-webkit-datetime-edit-day-field]:text-primary [&::-webkit-datetime-edit-year-field]:text-primary [&::-webkit-datetime-edit-hour-field]:text-primary [&::-webkit-datetime-edit-minute-field]:text-primary [&::-webkit-datetime-edit-ampm-field]:text-primary"
-                  style={{
-                    colorScheme: 'dark'
-                  }}
-                />
-                <p className="text-xs text-secondary mt-1">
-                  Set the date and time when this entry was originally written
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">
-                  Content
-                </label>
-                <RichTextEditor
-                  content={content}
-                  onChange={setContent}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">
-                  Tags
-                </label>
-                <Tags
+               <div>
+                 <label className="block text-sm font-medium text-primary mb-2">
+                   Tags
+                 </label>
+                                 <Tags
                   selectedTags={selectedTags}
                   availableTags={tags}
-                  onTagSelect={(tagId) => setSelectedTags([...selectedTags, tagId])}
-                  onTagRemove={(tagId) => setSelectedTags(selectedTags.filter(id => id !== tagId))}
+                  onTagSelect={(tagId) => {
+                    console.log('🏷️ TAG DEBUG - Selecting tag:', tagId);
+                    console.log('🏷️ TAG DEBUG - Current selected tags:', selectedTags);
+                    setSelectedTags([...selectedTags, tagId]);
+                  }}
+                  onTagRemove={(tagId) => {
+                    console.log('🏷️ TAG DEBUG - Removing tag:', tagId);
+                    console.log('🏷️ TAG DEBUG - Current selected tags:', selectedTags);
+                    setSelectedTags(selectedTags.filter(id => id !== tagId));
+                  }}
+                  onTagDelete={(tagId) => removeTag(tagId)}
                   onTagCreate={handleCreateTag}
                 />
-              </div>
+               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-primary mb-2">
-                  Mood
-                </label>
-                <MoodSelector value={mood} onChange={setMood} />
-              </div>
-            </div>
+               <div>
+                 <label className="block text-sm font-medium text-primary mb-2">
+                   Mood
+                 </label>
+                 <MoodSelector value={mood} onChange={setMood} />
+               </div>
+
+               <div>
+                 <label className="block text-sm font-medium text-primary mb-2">
+                   Entry Date & Time
+                 </label>
+                 <input
+                   type="datetime-local"
+                   value={entryDate}
+                   onChange={(e) => setEntryDate(e.target.value)}
+                   className="w-full px-3 py-2 bg-surface border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-primary [&::-webkit-calendar-picker-indicator]:bg-primary [&::-webkit-calendar-picker-indicator]:rounded [&::-webkit-calendar-picker-indicator]:p-1 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:hover:bg-primary/80 [&::-webkit-datetime-edit]:text-text-primary [&::-webkit-datetime-edit-fields-wrapper]:text-text-primary [&::-webkit-datetime-edit-text]:text-text-primary [&::-webkit-datetime-edit-month-field]:text-text-primary [&::-webkit-datetime-edit-day-field]:text-text-primary [&::-webkit-datetime-edit-year-field]:text-text-primary [&::-webkit-datetime-edit-hour-field]:text-text-primary [&::-webkit-datetime-edit-minute-field]:text-text-primary [&::-webkit-datetime-edit-ampm-field]:text-text-primary"
+                   style={{
+                     colorScheme: 'dark'
+                   }}
+                 />
+                 <p className="text-xs text-text-secondary mt-1">
+                   Set the date and time when this entry was originally written
+                 </p>
+               </div>
+
+               <div>
+                 <label className="block text-sm font-medium text-primary mb-2">
+                   Content
+                 </label>
+                 <RichTextEditor
+                   content={content}
+                   onChange={setContent}
+                 />
+               </div>
+             </div>
           </div>
         </div>
       </div>

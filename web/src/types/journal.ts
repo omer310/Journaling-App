@@ -9,4 +9,5 @@ export interface JournalEntry {
   tags?: string[];
   mood?: 'happy' | 'sad' | 'neutral' | 'excited' | 'anxious' | 'calm';
   source?: 'mobile' | 'web';
+  font_family?: string;
 } 
