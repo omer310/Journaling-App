@@ -168,7 +168,7 @@ export function RichTextEditor({
     if (!editor || !autosave) return;
 
     const timer = setTimeout(() => {
-      console.log('Autosaving...', editor.getHTML());
+      // Autosave functionality - silent operation
     }, AUTOSAVE_DELAY);
 
     return () => clearTimeout(timer);

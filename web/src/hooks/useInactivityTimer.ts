@@ -38,8 +38,6 @@ export function useInactivityTimer({
     // Update last activity time
     updateLastActivityTime();
     isActiveRef.current = true;
-    
-    console.log('Inactivity timer reset - user activity detected');
 
     const timeout = getInactivityTimeout();
     const warningTimeMs = Math.min(warningTime, timeout - 30000); // Ensure warning is at least 30s before timeout
@@ -67,8 +65,6 @@ export function useInactivityTimer({
     // Set logout timer
     timeoutRef.current = setTimeout(async () => {
       if (isActiveRef.current) {
-        console.log('Auto-logout due to inactivity');
-        
         // Call custom timeout handler if provided
         if (onTimeout) {
           onTimeout();
@@ -89,11 +85,8 @@ export function useInactivityTimer({
 
   useEffect(() => {
     if (!enabled) {
-      console.log('Inactivity timer disabled');
       return;
     }
-
-    console.log('Inactivity timer enabled - setting up listeners');
 
     // Set up activity listeners
     const events = [
@@ -113,7 +106,6 @@ export function useInactivityTimer({
     // Initial timer setup - start fresh when user logs in
     // Add a small delay to ensure user has time to interact
     setTimeout(() => {
-      console.log('Starting inactivity timer');
       resetTimer();
     }, 1000);
 
@@ -123,7 +115,6 @@ export function useInactivityTimer({
     }
 
     return () => {
-      console.log('Cleaning up inactivity timer');
       // Clean up event listeners
       events.forEach(event => {
         document.removeEventListener(event, handleUserActivity);

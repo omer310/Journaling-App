@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { SocialAuth } from "@/components/SocialAuth";
+import { useRateLimit } from "@/lib/rateLimiter";
+import { monitoringUtils } from "@/lib/securityMonitoring";
 import Link from "next/link";
 import {
   RiEyeLine,
@@ -38,7 +40,45 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState({
+    remainingAttempts: 5,
+    timeUntilReset: 0,
+    isLocked: false
+  });
   const router = useRouter();
+
+  // Initialize rate limiting and security monitoring
+  const { checkLimit: isLoginAllowed, recordAttempt: recordLoginAttempt, getStatus: getLoginStatus } = useRateLimit('LOGIN_ATTEMPTS', email);
+
+  // Update status in real-time
+  useEffect(() => {
+    const updateStatus = () => {
+      const status = getLoginStatus();
+      setCurrentStatus(prevStatus => {
+        // Only update if the status has actually changed
+        if (
+          prevStatus.remainingAttempts !== status.remainingAttempts ||
+          prevStatus.timeUntilReset !== status.timeUntilReset ||
+          prevStatus.isLocked !== status.isLocked
+        ) {
+          return {
+            remainingAttempts: status.remainingAttempts,
+            timeUntilReset: status.timeUntilReset,
+            isLocked: status.isLocked
+          };
+        }
+        return prevStatus;
+      });
+    };
+
+    // Update immediately
+    updateStatus();
+
+    // Update every second for countdown
+    const interval = setInterval(updateStatus, 1000);
+
+    return () => clearInterval(interval);
+  }, [email]); // Only depend on email changes, not getLoginStatus
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,11 +92,17 @@ export default function LoginPage() {
       return; // Prevent multiple submissions
     }
 
+    // Check rate limiting before attempting login
+    if (!isLoginAllowed()) {
+      const status = getLoginStatus();
+      const minutes = Math.ceil(status.timeUntilReset / 60000);
+      setError(`Too many login attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`);
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
-
-      console.log("Attempting login for:", email);
 
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -64,10 +110,20 @@ export default function LoginPage() {
       });
 
       if (error) {
+        // Record failed login for rate limiting and security monitoring
+        recordLoginAttempt();
+        monitoringUtils.recordFailedLogin(email, {
+          reason: error.message,
+          userAgent: navigator.userAgent
+        });
+
         throw error;
       }
 
-      console.log("Login successful, redirecting...");
+      // Record successful login (no rate limiting for successful logins)
+      monitoringUtils.recordEvent('LOGIN_SUCCESS', {
+        userAgent: navigator.userAgent
+      }, 'LOW', undefined, email);
 
       // Add a small delay to ensure auth state is properly set
       setTimeout(() => {
@@ -79,6 +135,17 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Format time for display
+  const formatTime = (ms: number) => {
+    if (ms <= 0) return '0s';
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    }
+    return `${seconds}s`;
   };
 
   return (
@@ -113,6 +180,20 @@ export default function LoginPage() {
                 {error}
               </div>
             )}
+
+                         {/* Rate limiting status */}
+             {currentStatus.remainingAttempts < 5 && (
+               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 text-yellow-700 dark:text-yellow-400 px-4 py-3 rounded-xl text-sm">
+                 <div className="flex items-center justify-between">
+                   <span>Login attempts remaining: {currentStatus.remainingAttempts}</span>
+                   {currentStatus.timeUntilReset > 0 && (
+                     <span className="text-xs">
+                       Resets in {formatTime(currentStatus.timeUntilReset)}
+                     </span>
+                   )}
+                 </div>
+               </div>
+             )}
 
             {/* Email field */}
             <div className="space-y-2">
@@ -179,7 +260,7 @@ export default function LoginPage() {
             {/* Sign in button */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !isLoginAllowed()}
               className="w-full bg-gradient-to-r from-primary to-primary-light text-white py-3.5 px-4 rounded-xl font-medium hover:shadow-lg hover:shadow-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] group"
             >
               <span className="flex items-center justify-center gap-2">
@@ -187,6 +268,11 @@ export default function LoginPage() {
                   <>
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     Signing in...
+                  </>
+                ) : !isLoginAllowed() ? (
+                  <>
+                    Rate Limited
+                    <RiArrowRightLine className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1" />
                   </>
                 ) : (
                   <>

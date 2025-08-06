@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RiSearchLine, RiCloseLine } from 'react-icons/ri';
 import debounce from 'lodash/debounce';
+import { sanitizeSearchHtml } from '@/lib/sanitize';
 
 interface SearchResult {
   id: string;
@@ -63,10 +64,13 @@ export function Search({
     if (!searchQuery.trim()) return text;
 
     const regex = new RegExp(`(${searchQuery})`, 'gi');
-    return text.replace(
+    const highlightedText = text.replace(
       regex,
       '<mark class="bg-primary-light/20 dark:bg-primary-dark/30 rounded px-1">$1</mark>'
     );
+    
+    // Sanitize the highlighted text to prevent XSS
+    return sanitizeSearchHtml(highlightedText);
   };
 
   const handleResultClick = (result: SearchResult) => {

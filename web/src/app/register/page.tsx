@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { SocialAuth } from '@/components/SocialAuth';
+import { validatePassword } from '@/lib/validation';
+import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
 import Link from 'next/link';
 import { RiEyeLine, RiEyeOffLine, RiMailLine, RiLockLine, RiArrowRightLine, RiCheckLine } from 'react-icons/ri';
 
@@ -32,18 +34,9 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // Password strength checker
-  const getPasswordStrength = (password: string) => {
-    if (password.length === 0) return { strength: 0, label: '' };
-    if (password.length < 6) return { strength: 1, label: 'Too short' };
-    if (password.length < 8) return { strength: 2, label: 'Fair' };
-    if (password.length >= 8 && /[A-Z]/.test(password) && /[0-9]/.test(password)) {
-      return { strength: 4, label: 'Strong' };
-    }
-    return { strength: 3, label: 'Good' };
-  };
-
-  const passwordStrength = getPasswordStrength(password);
+  // Enhanced password validation
+  const passwordValidation = validatePassword(password, { email });
+  const isPasswordValid = passwordValidation.isValid;
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,8 +51,9 @@ export default function RegisterPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (!isPasswordValid) {
+      const passwordErrors = passwordValidation.errors.map(err => err.message).join(', ');
+      setError(`Password issues: ${passwordErrors}`);
       return;
     }
 
@@ -166,30 +160,14 @@ export default function RegisterPage() {
                 </button>
               </div>
               
-              {/* Password strength indicator */}
+              {/* Enhanced password strength meter */}
               {password && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 bg-surface rounded-full h-2 overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-300 ${
-                          passwordStrength.strength === 1 ? 'w-1/4 bg-red-500' :
-                          passwordStrength.strength === 2 ? 'w-2/4 bg-yellow-500' :
-                          passwordStrength.strength === 3 ? 'w-3/4 bg-blue-500' :
-                          passwordStrength.strength === 4 ? 'w-full bg-green-500' : 'w-0'
-                        }`}
-                      />
-                    </div>
-                    <span className={`text-xs font-medium ${
-                      passwordStrength.strength === 1 ? 'text-red-500' :
-                      passwordStrength.strength === 2 ? 'text-yellow-500' :
-                      passwordStrength.strength === 3 ? 'text-blue-500' :
-                      passwordStrength.strength === 4 ? 'text-green-500' : ''
-                    }`}>
-                      {passwordStrength.label}
-                    </span>
-                  </div>
-                </div>
+                <PasswordStrengthMeter
+                  password={password}
+                  userInfo={{ email }}
+                  onPasswordChange={setPassword}
+                  className="mt-3"
+                />
               )}
             </div>
 

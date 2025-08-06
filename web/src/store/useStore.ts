@@ -678,8 +678,6 @@ export const setupRealtimeSubscription = async (userId: string) => {
         filter: `user_id=eq.${userId}`,
       },
       async (payload) => {
-        console.log('Real-time update:', payload);
-        
         // Clear any existing timeout
         if (realtimeUpdateTimeout) {
           clearTimeout(realtimeUpdateTimeout);
@@ -699,7 +697,7 @@ export const setupRealtimeSubscription = async (userId: string) => {
       }
     )
     .subscribe((status) => {
-      console.log('Real-time subscription status:', status);
+      // Real-time subscription status tracking
     });
 };
 

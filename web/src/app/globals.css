@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Indie+Flower&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+/* stylelint-disable-next-line at-rule-no-unknown */
 @theme {
   --color-primary: #009F6B;
   --color-primary-light: #00B377;
@@ -21,6 +22,7 @@
   --font-arabic: 'Noto Naskh Arabic', system-ui;
 }
 
+/* stylelint-disable-next-line at-rule-no-unknown */
 @theme dark {
   --color-background: #0a0a0a;
   --color-primary: #00B377;

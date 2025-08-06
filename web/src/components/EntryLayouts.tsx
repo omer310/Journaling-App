@@ -1,4 +1,5 @@
 import { RiEdit2Line, RiDeleteBinLine, RiCheckboxBlankLine, RiCheckboxFill } from 'react-icons/ri';
+import { sanitizeRichTextHtml } from '@/lib/sanitize';
 
 interface Entry {
   id: string;
@@ -106,7 +107,7 @@ export function ListLayout({ entries, tags, selectedEntries, onSelect, onEdit, o
                   </div>
                   <div
                     className="prose dark:prose-invert line-clamp-3"
-                    dangerouslySetInnerHTML={{ __html: entry.content }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeRichTextHtml(entry.content) }}
                   />
                   <div className="flex flex-wrap gap-2 mt-4">
                     {entry.mood && (
@@ -240,7 +241,7 @@ export function GridLayout({ entries = [], tags = [], selectedEntries = [], onSe
             </div>
             <div
               className="prose dark:prose-invert text-sm line-clamp-4 mb-3"
-              dangerouslySetInnerHTML={{ __html: entry.content }}
+              dangerouslySetInnerHTML={{ __html: sanitizeRichTextHtml(entry.content) }}
             />
             <div className="flex flex-wrap gap-1">
               {entry.mood && (

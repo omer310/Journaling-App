@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { getInactivityTimeout, setInactivityTimeout } from '@/lib/dateUtils';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 // Custom styles for radio buttons to match app theme
 const radioButtonStyles = `
@@ -81,7 +82,7 @@ export default function InactivitySettings({ className = '' }: InactivitySetting
 
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
-      <style dangerouslySetInnerHTML={{ __html: radioButtonStyles }} />
+      <style dangerouslySetInnerHTML={{ __html: sanitizeHtml(radioButtonStyles) }} />
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-2 text-sm text-secondary hover:text-primary transition-colors"
