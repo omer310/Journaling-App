@@ -179,15 +179,6 @@ export default function SecurityDashboard() {
                 Access Dashboard
               </button>
             </form>
-            
-            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Environment Variable Set:</strong> NEXT_PUBLIC_ADMIN_PASSWORD
-              </p>
-              <p className="text-xs text-blue-700 mt-1">
-                Using secure environment variable for authentication.
-              </p>
-            </div>
           </div>
         </div>
       </div>
