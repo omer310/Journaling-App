@@ -23,8 +23,8 @@ export function useInactivityTimer({
 }: UseInactivityTimerOptions = {}) {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const warningRef = useRef<NodeJS.Timeout | null>(null);
-  const isActiveRef = useRef(false);
   const lastActivityRef = useRef<number>(Date.now());
+  const isTimerActiveRef = useRef<boolean>(false);
 
   const clearAllTimers = useCallback(() => {
     if (timeoutRef.current) {
@@ -37,6 +37,26 @@ export function useInactivityTimer({
     }
   }, []);
 
+  const performLogout = useCallback(async () => {
+    console.log('Performing automatic logout due to inactivity');
+    
+    try {
+      // Call custom timeout handler if provided
+      if (onTimeout) {
+        onTimeout();
+      } else {
+        // Default behavior: sign out
+        await supabase.auth.signOut();
+        // Force redirect to login page
+        window.location.href = '/login?reason=Session expired due to inactivity';
+      }
+    } catch (error) {
+      console.error('Auto-logout error:', error);
+      // Force redirect even if signOut fails
+      window.location.href = '/login?reason=Session expired due to inactivity';
+    }
+  }, [onTimeout]);
+
   const resetTimer = useCallback(() => {
     if (!enabled) return;
 
@@ -47,7 +67,7 @@ export function useInactivityTimer({
     const now = Date.now();
     lastActivityRef.current = now;
     updateLastActivityTime();
-    isActiveRef.current = true;
+    isTimerActiveRef.current = true;
 
     const timeout = getInactivityTimeout();
     const warningTimeMs = Math.min(warningTime, timeout - 30000); // Ensure warning is at least 30s before timeout
@@ -57,7 +77,9 @@ export function useInactivityTimer({
     // Set warning timer
     if (warningTimeMs > 0 && timeout > warningTimeMs) {
       warningRef.current = setTimeout(() => {
-        // Double-check if user is still inactive
+        if (!isTimerActiveRef.current) return; // Timer was disabled
+        
+        // Check if user is still inactive at warning time
         const currentTime = Date.now();
         const timeSinceLastActivity = currentTime - lastActivityRef.current;
         
@@ -92,47 +114,36 @@ export function useInactivityTimer({
     }
 
     // Set logout timer
-    timeoutRef.current = setTimeout(async () => {
-      // Double-check if user is still inactive
+    timeoutRef.current = setTimeout(() => {
+      if (!isTimerActiveRef.current) return; // Timer was disabled
+      
+      // Final check if user is still inactive at logout time
       const currentTime = Date.now();
       const timeSinceLastActivity = currentTime - lastActivityRef.current;
       
-      if (timeSinceLastActivity >= timeout && isActiveRef.current) {
+      if (timeSinceLastActivity >= timeout) {
         console.log('Inactivity timeout - signing out user');
-        
-        // Call custom timeout handler if provided
-        if (onTimeout) {
-          onTimeout();
-        } else {
-          // Default behavior: sign out
-          try {
-            await supabase.auth.signOut();
-            // Force redirect to login page
-            window.location.href = '/login?reason=Session expired due to inactivity';
-          } catch (error) {
-            console.error('Auto-logout error:', error);
-            // Force redirect even if signOut fails
-            window.location.href = '/login?reason=Session expired due to inactivity';
-          }
-        }
-        
-        isActiveRef.current = false;
+        performLogout();
       } else {
         // User became active again, don't log out
         console.log('User became active, canceling logout. Time since activity:', timeSinceLastActivity);
+        // Reset the timer since user is active
+        resetTimer();
       }
     }, timeout);
-  }, [enabled, onTimeout, warningTime, onWarning, clearAllTimers]);
+  }, [enabled, warningTime, onWarning, clearAllTimers, performLogout]);
 
   const handleUserActivity = useCallback(() => {
-    if (!enabled) return;
+    if (!enabled || !isTimerActiveRef.current) return;
     
     const now = Date.now();
     const timeSinceLastActivity = now - lastActivityRef.current;
     
     // Only reset if enough time has passed to avoid excessive resets
-    if (timeSinceLastActivity > 5000) { // 5 seconds threshold
+    if (timeSinceLastActivity > 3000) { // 3 seconds threshold
       console.log('User activity detected, resetting timer');
+      lastActivityRef.current = now;
+      updateLastActivityTime();
       resetTimer();
     } else {
       // Just update the last activity time without resetting timers
@@ -144,6 +155,7 @@ export function useInactivityTimer({
   useEffect(() => {
     if (!enabled) {
       clearAllTimers();
+      isTimerActiveRef.current = false;
       return;
     }
 
@@ -155,7 +167,8 @@ export function useInactivityTimer({
       'scroll',
       'touchstart',
       'click',
-      'focus'
+      'focus',
+      'keydown'
     ];
 
     // Add event listeners with passive option for better performance
@@ -163,8 +176,7 @@ export function useInactivityTimer({
       document.addEventListener(event, handleUserActivity, { passive: true });
     });
 
-    // Initial timer setup - start fresh when user logs in
-    // Add a small delay to ensure user has time to interact
+    // Initial timer setup - start fresh when hook is enabled
     const initialTimer = setTimeout(() => {
       resetTimer();
     }, 1000);
@@ -183,15 +195,16 @@ export function useInactivityTimer({
         document.removeEventListener(event, handleUserActivity);
       });
 
-      // Clear timers
+      // Clear timers and mark as inactive
       clearAllTimers();
+      isTimerActiveRef.current = false;
     };
   }, [enabled, handleUserActivity, resetTimer, clearAllTimers]);
 
   // Expose methods for manual control
   const pauseTimer = useCallback(() => {
     clearAllTimers();
-    isActiveRef.current = false;
+    isTimerActiveRef.current = false;
   }, [clearAllTimers]);
 
   const resumeTimer = useCallback(() => {
@@ -204,6 +217,6 @@ export function useInactivityTimer({
     resetTimer,
     pauseTimer,
     resumeTimer,
-    isActive: isActiveRef.current
+    isActive: isTimerActiveRef.current
   };
 }
