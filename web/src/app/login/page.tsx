@@ -40,6 +40,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
   const [currentStatus, setCurrentStatus] = useState({
     remainingAttempts: 5,
     timeUntilReset: 0,
@@ -49,6 +50,34 @@ export default function LoginPage() {
 
   // Initialize rate limiting and security monitoring
   const { checkLimit: isLoginAllowed, recordAttempt: recordLoginAttempt, getStatus: getLoginStatus } = useRateLimit('LOGIN_ATTEMPTS', email);
+
+  // Check authentication status on page load
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        setAuthChecking(true);
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Auth check error:', error);
+          setError('Authentication check failed. Please try refreshing the page.');
+          return;
+        }
+        
+        if (session) {
+          router.push('/');
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        setError('Connection error. Please check your internet connection.');
+      } finally {
+        setAuthChecking(false);
+      }
+    };
+    
+    checkAuth();
+  }, [router]);
 
   // Update status in real-time
   useEffect(() => {
@@ -78,7 +107,7 @@ export default function LoginPage() {
     const interval = setInterval(updateStatus, 1000);
 
     return () => clearInterval(interval);
-  }, [email]); // Only depend on email changes, not getLoginStatus
+  }, [email, getLoginStatus]); // Only depend on email changes, not getLoginStatus
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,7 +156,7 @@ export default function LoginPage() {
 
       // Add a small delay to ensure auth state is properly set
       setTimeout(() => {
-        router.push("/journal");
+        router.push("/");
       }, 100);
     } catch (error: any) {
       console.error("Login error:", error);
@@ -147,6 +176,19 @@ export default function LoginPage() {
     }
     return `${seconds}s`;
   };
+
+  // Show loading screen while checking authentication
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-6"></div>
+          <h2 className="text-xl font-semibold text-text-primary mb-2">Checking Authentication</h2>
+          <p className="text-text-secondary">Please wait...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">

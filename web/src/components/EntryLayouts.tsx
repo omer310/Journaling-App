@@ -1,5 +1,6 @@
 import { RiEdit2Line, RiDeleteBinLine, RiCheckboxBlankLine, RiCheckboxFill } from 'react-icons/ri';
 import { sanitizeRichTextHtml } from '@/lib/sanitize';
+import { normalizeDateForDisplay } from '@/lib/dateUtils';
 
 interface Entry {
   id: string;
@@ -378,6 +379,158 @@ export function CompactLayout({ entries = [], tags = [], selectedEntries = [], o
           </div>
         );
       })}
+    </div>
+  );
+} 
+
+export function TimelineLayout({ entries = [], tags = [], selectedEntries = [], onSelect, onEdit, onDelete }: EntryLayoutProps) {
+  // Add null checks
+  if (!entries || !Array.isArray(entries)) {
+    return (
+      <div className="bg-surface rounded-xl shadow-lg p-6 text-center">
+        <p className="text-secondary">Loading entries...</p>
+      </div>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <div className="bg-surface rounded-xl shadow-lg p-6 text-center">
+        <p className="text-secondary">No entries found</p>
+      </div>
+    );
+  }
+
+  // Group entries by date using normalized dates
+  const groupedEntries = entries.reduce((groups, entry) => {
+    const normalizedDate = normalizeDateForDisplay(entry.date);
+    const displayDate = new Date(entry.date).toLocaleDateString('en-US', { 
+      weekday: 'long',
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    
+    if (!groups[displayDate]) {
+      groups[displayDate] = [];
+    }
+    groups[displayDate].push(entry);
+    return groups;
+  }, {} as Record<string, typeof entries>);
+
+  // Sort dates
+  const sortedDates = Object.keys(groupedEntries).sort((a, b) => 
+    new Date(b).getTime() - new Date(a).getTime()
+  );
+
+  return (
+    <div className="relative">
+      {/* Timeline line */}
+      <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border"></div>
+      
+      <div className="space-y-8">
+        {sortedDates.map((date) => (
+          <div key={date} className="relative">
+            {/* Date header */}
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mr-4 z-10 relative">
+                <span className="text-white text-sm font-semibold">
+                  {new Date(date).getDate()}
+                </span>
+              </div>
+              <h3 className="text-lg font-semibold text-text-primary">{date}</h3>
+            </div>
+            
+            {/* Entries for this date */}
+            <div className="ml-16 space-y-4">
+              {groupedEntries[date].map((entry: Entry) => {
+                const entryTags = getTagsArray(entry.tags);
+                
+                return (
+                  <div
+                    key={entry.id}
+                    className={`bg-surface rounded-xl shadow-lg p-4 transition-colors duration-200 ${
+                      selectedEntries.includes(entry.id) ? 'ring-2 ring-primary' : ''
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <button onClick={() => onSelect(entry.id)}>
+                        {selectedEntries.includes(entry.id) ? (
+                          <RiCheckboxFill className="w-5 h-5 text-primary" />
+                        ) : (
+                          <RiCheckboxBlankLine className="w-5 h-5 text-text-secondary" />
+                        )}
+                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => onEdit(entry.id)}
+                          className="p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20"
+                          title="Edit entry"
+                        >
+                          <RiEdit2Line className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => onDelete(entry.id)}
+                          className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20"
+                          title="Delete entry"
+                        >
+                          <RiDeleteBinLine className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <h2 className="text-lg font-semibold text-primary mb-2">{entry.title}</h2>
+                    
+                    <div className="flex items-center gap-2 mb-3">
+                      <p className="text-sm text-text-secondary">
+                        {new Date(entry.date).toLocaleTimeString()}
+                      </p>
+                      {entry.source && (
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          entry.source === 'mobile' 
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' 
+                            : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        }`}>
+                          {entry.source}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div
+                      className="prose dark:prose-invert text-sm line-clamp-3 mb-3"
+                      dangerouslySetInnerHTML={{ __html: sanitizeRichTextHtml(entry.content) }}
+                    />
+                    
+                    <div className="flex flex-wrap gap-2">
+                      {entry.mood && (
+                        <span
+                          className={`tag text-xs ${
+                            entry.mood === 'happy'
+                              ? 'text-green-500 border-green-500'
+                              : entry.mood === 'sad'
+                              ? 'text-red-500 border-red-500'
+                              : 'text-yellow-500 border-yellow-500'
+                          }`}
+                        >
+                          {entry.mood}
+                        </span>
+                      )}
+                      {entryTags.map((tagId) => {
+                        const tag = tags.find((t) => t.id === tagId);
+                        return tag ? (
+                          <span key={tagId} className="tag text-xs">
+                            {tag.name}
+                          </span>
+                        ) : null;
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 } 

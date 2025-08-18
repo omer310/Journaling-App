@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { supabase } from '@/lib/supabase';
 import { encryptData, decryptData, isEncrypted } from '@/lib/encryption';
+import { normalizeDateForStorage, normalizeDateForDisplay, normalizeDateForMobileEntry } from '@/lib/dateUtils';
 
 // Create a custom storage that checks for window/localStorage availability
 const customStorage = {
@@ -61,6 +62,15 @@ interface AppState {
   // Layout preferences
   layoutMode: 'list' | 'grid' | 'compact';
   setLayoutMode: (mode: 'list' | 'grid' | 'compact') => void;
+
+  // UI state
+  composerOpen: boolean;
+  openComposer: () => void;
+  closeComposer: () => void;
+  editComposerOpen: boolean;
+  editEntryId: string | null;
+  openEditComposer: (entryId: string) => void;
+  closeEditComposer: () => void;
 
   // Cache management
   cachedEntries: JournalEntry[];
@@ -124,6 +134,15 @@ export const useStore = create<AppState>()(
       layoutMode: 'list',
       setLayoutMode: (mode) => set({ layoutMode: mode }),
 
+      // UI state
+      composerOpen: false,
+      openComposer: () => set({ composerOpen: true }),
+      closeComposer: () => set({ composerOpen: false }),
+      editComposerOpen: false,
+      editEntryId: null,
+      openEditComposer: (entryId) => set({ editComposerOpen: true, editEntryId: entryId }),
+      closeEditComposer: () => set({ editComposerOpen: false, editEntryId: null }),
+
       // Cache management
       cachedEntries: [],
       lastFetchTime: 0,
@@ -171,34 +190,63 @@ export const useStore = create<AppState>()(
           return;
         }
 
-        try {
-          set({ entriesLoading: true, lastSyncTime: null });
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) {
-            console.log('No user authenticated, skipping fetch');
-            set({ entriesLoading: false });
-            return;
-          }
+        let retryCount = 0;
+        const maxRetries = 3;
 
-          const { data: entries, error } = await supabase
-            .from('journal_entries')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('last_modified', { ascending: false });
+        const attemptFetch = async (): Promise<void> => {
+          try {
+            set({ entriesLoading: true, lastSyncTime: null });
+            
+            // Check authentication with timeout
+            const authPromise = supabase.auth.getUser();
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Authentication timeout')), 10000)
+            );
+            
+            const { data: { user }, error: authError } = await Promise.race([
+              authPromise,
+              timeoutPromise
+            ]) as { data: { user: any }, error: any };
 
-          if (error) {
-            console.error('Error fetching entries:', error);
-            throw error;
-          }
+            if (authError) {
+              throw authError;
+            }
 
-          if (!entries) {
-            throw new Error('No entries returned from database');
-          }
+            if (!user) {
+              console.log('No user authenticated, skipping fetch');
+              set({ entriesLoading: false });
+              return;
+            }
 
-          const decryptedEntries: JournalEntry[] = [];
-          const { tags: existingTags } = get();
-          
-          for (const entry of entries) {
+            // Fetch entries with timeout
+            const fetchPromise = supabase
+              .from('journal_entries')
+              .select('*')
+              .eq('user_id', user.id)
+              .order('last_modified', { ascending: false });
+              
+            const fetchTimeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Data fetch timeout')), 15000)
+            );
+
+            const { data: entries, error } = await Promise.race([
+              fetchPromise,
+              fetchTimeoutPromise
+            ]) as { data: any, error: any };
+
+            if (error) {
+              console.error('Error fetching entries:', error);
+              throw error;
+            }
+
+            if (!entries) {
+              throw new Error('No entries returned from database');
+            }
+
+            const decryptedEntries: JournalEntry[] = [];
+            const { tags: existingTags } = get();
+            
+            for (const entry of entries) {
             try {
               // Decrypt the title and content if they're encrypted
               const title = isEncrypted(entry.title) ? await decryptData(entry.title) : entry.title;
@@ -223,11 +271,19 @@ export const useStore = create<AppState>()(
                 }));
               }
 
+              // Normalize the date to ensure consistent timezone handling
+              // Use special handling for mobile entries
+              const normalizedDate = entry.source === 'mobile' 
+                ? normalizeDateForMobileEntry(entry.date)
+                : normalizeDateForStorage(entry.date);
+              
+              
+              
               decryptedEntries.push({
                 id: entry.id,
                 title: title || '',
                 content: content || '',
-                date: entry.date,
+                date: normalizedDate,
                 tags: entryTags,
                 lastModified: entry.last_modified,
                 userId: entry.user_id,
@@ -258,11 +314,32 @@ export const useStore = create<AppState>()(
             entriesLoading: false,
             lastSyncTime: new Date().toISOString()
           });
-        } catch (error) {
-          console.error('Error in fetchEntries:', error);
+        } catch (error: any) {
+          console.error(`Error in fetchEntries (attempt ${retryCount + 1}/${maxRetries}):`, error);
+          
+          if (retryCount < maxRetries - 1) {
+            retryCount++;
+            const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+            console.log(`Retrying fetch entries in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return attemptFetch();
+          }
+          
           set({ entriesLoading: false });
+          
+          // If we have cached entries, use them as fallback
+          const { cachedEntries } = get();
+          if (cachedEntries.length > 0) {
+            console.log('Using cached entries as fallback');
+            set({ entries: cachedEntries });
+            return;
+          }
+          
           throw error; // Re-throw the error to be handled by the UI
         }
+      };
+
+      return attemptFetch();
       },
       addEntry: async (entry) => {
         try {
@@ -275,12 +352,15 @@ export const useStore = create<AppState>()(
           const tempId = crypto.randomUUID();
           const now = new Date().toISOString();
 
+          // Normalize the date to ensure consistent timezone handling
+          const normalizedDate = normalizeDateForStorage(entry.date);
+          
           // Create optimistic entry for immediate display
           const optimisticEntry: JournalEntry = {
             id: tempId,
             title: entry.title.trim(),
             content: entry.content.trim(),
-            date: entry.date,
+            date: normalizedDate,
             tags: entry.tags || [],
             lastModified: now,
             userId: user.id,
@@ -300,7 +380,7 @@ export const useStore = create<AppState>()(
           const entryData = {
             title: await encryptData(entry.title.trim()),
             content: await encryptData(entry.content.trim()),
-            date: entry.date,
+            date: normalizedDate,
             tags: entry.tags || [],
             user_id: user.id,
             source: 'web' as const,
@@ -399,7 +479,7 @@ export const useStore = create<AppState>()(
           // Copy other fields as is
           if (entry.tags !== undefined) updatedEntry.tags = entry.tags;
           if (entry.mood !== undefined) updatedEntry.mood = entry.mood;
-          if (entry.date !== undefined) updatedEntry.date = entry.date;
+          if (entry.date !== undefined) updatedEntry.date = normalizeDateForStorage(entry.date);
 
           const { error } = await supabase
             .from('journal_entries')

@@ -1,6 +1,6 @@
-import { RiListUnordered, RiGridFill, RiMenuLine } from 'react-icons/ri';
+import { RiListUnordered, RiGridFill, RiMenuLine, RiTimeLine } from 'react-icons/ri';
 
-export type LayoutMode = 'list' | 'grid' | 'compact';
+export type LayoutMode = 'list' | 'grid' | 'compact' | 'timeline';
 
 interface LayoutSelectorProps {
   value: LayoutMode;
@@ -20,6 +20,11 @@ export function LayoutSelector({ value, onChange }: LayoutSelectorProps) {
       label: 'Grid View',
     },
     {
+      id: 'timeline' as const,
+      icon: <RiTimeLine className="w-4 h-4" />,
+      label: 'Timeline View',
+    },
+    {
       id: 'compact' as const,
       icon: <RiMenuLine className="w-4 h-4" />,
       label: 'Compact View',
@@ -27,15 +32,15 @@ export function LayoutSelector({ value, onChange }: LayoutSelectorProps) {
   ];
 
   return (
-    <div className="flex gap-1 bg-[#2a2a2a] p-1 rounded-lg">
+    <div className="flex gap-1 bg-surface border border-border p-1 rounded-lg">
       {layouts.map((layout) => (
         <button
           key={layout.id}
           onClick={() => onChange(layout.id)}
           className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors duration-200 ${
             value === layout.id
-              ? 'bg-[#00ff9d] text-black'
-              : 'text-[#888] hover:text-white'
+              ? 'bg-primary text-white'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
           }`}
           title={layout.label}
         >

@@ -11,6 +11,7 @@ import LogoutButton from "@/components/LogoutButton";
 import InactivitySettings from "@/components/InactivitySettings";
 import InactivityWarning from "@/components/InactivityWarning";
 import Head from "next/head";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -114,22 +115,6 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
                 >
                   Soul Pages
                 </Link>
-                {user && (
-                  <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                    <Link
-                      href="/journal"
-                      className="inline-flex items-center px-1 pt-1 text-sm font-medium text-secondary hover:text-primary"
-                    >
-                      Write
-                    </Link>
-                    <Link
-                      href="/entries"
-                      className="inline-flex items-center px-1 pt-1 text-sm font-medium text-secondary hover:text-primary"
-                    >
-                      Entries
-                    </Link>
-                  </div>
-                )}
               </div>
 
               <div className="flex items-center gap-4">
@@ -143,7 +128,6 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
                 {user && (
                   <>
                     {/* Font Selector */}
-
                     <div
                       className="relative font-selector-dropdown"
                       ref={fontSelectorRef}
@@ -164,7 +148,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
                       </button>
 
                       {showFontSelector && (
-                        <div className="absolute right-0 top-12 bg-surface border border-border rounded-xl shadow-2xl p-2 min-w-[200px] max-h-[300px] overflow-y-auto scrollbar-hide">
+                        <div className="absolute right-0 top-12 bg-surface border border-border rounded-xl shadow-2xl p-2 min-w-[200px] max-h-[300px] overflow-y-auto scrollbar-hide z-50">
                           <div className="px-3 py-2 text-xs font-medium text-text-secondary border-b border-border mb-2">
                             Current:{" "}
                             <span style={{ fontFamily: selectedFont }}>
@@ -224,7 +208,11 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </nav>
 
-        <main>{children}</main>
+        <main>
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
+        </main>
         {user && <InactivityWarning />}
       </div>
     </>

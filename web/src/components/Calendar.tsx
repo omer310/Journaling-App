@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import dayjs from 'dayjs';
+import { normalizeDateForDisplay } from '@/lib/dateUtils';
 import {
   RiArrowLeftSLine,
   RiArrowRightSLine,
   RiCalendarLine,
+  RiArrowDownSLine,
 } from 'react-icons/ri';
 
 interface CalendarProps {
@@ -15,62 +17,73 @@ interface CalendarProps {
     title: string;
   }[];
   onDateSelect: (date: Date) => void;
+  onClearFilters?: () => void;
 }
 
-export function Calendar({ entries, onDateSelect }: CalendarProps) {
+export function Calendar({ entries, onDateSelect, onClearFilters }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(dayjs());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
+  const monthDropdownRef = useRef<HTMLDivElement>(null);
+  const yearDropdownRef = useRef<HTMLDivElement>(null);
   
   const calendarDays = useMemo(() => {
     const daysInMonth = currentDate.daysInMonth();
     const firstDayOfMonth = currentDate.startOf('month').day();
-    const lastDayOfMonth = currentDate.endOf('month').day();
     
     const days = [];
-    const entriesByDate = new Map(
-      entries.map(entry => [dayjs(entry.date).format('YYYY-MM-DD'), entry])
-    );
+    const entriesByDate = new Map<string, number>();
+    
+    // Count entries per date using normalized dates
+    entries.forEach(entry => {
+      const normalizedDate = normalizeDateForDisplay(entry.date);
+      entriesByDate.set(normalizedDate, (entriesByDate.get(normalizedDate) || 0) + 1);
+    });
 
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < firstDayOfMonth; i++) {
-      days.push(<div key={`empty-start-${i}`} className="calendar-day opacity-0" />);
+      days.push(<div key={`empty-start-${i}`} className="calendar-day empty" />);
     }
 
     // Add cells for each day of the month
     for (let i = 1; i <= daysInMonth; i++) {
       const date = currentDate.date(i);
       const dateStr = date.format('YYYY-MM-DD');
-      const hasEntry = entriesByDate.has(dateStr);
+      const entryCount = entriesByDate.get(dateStr) || 0;
       const isToday = date.isSame(dayjs(), 'day');
+      const isSelected = selectedDate && date.isSame(dayjs(selectedDate), 'day');
 
       days.push(
         <button
           key={i}
-          onClick={() => onDateSelect(date.toDate())}
-          className={`calendar-day hover:bg-surface-hover ${
-            hasEntry ? 'has-entry font-medium text-primary' : ''
-          } ${
-            isToday
-              ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-dark-bg'
-              : ''
-          }`}
+          onClick={() => {
+            setSelectedDate(date.toDate());
+            onDateSelect(date.toDate());
+          }}
+          className={`calendar-day ${entryCount > 0 ? 'has-entries' : ''} ${
+            isToday ? 'today' : ''
+          } ${isSelected ? 'selected' : ''}`}
         >
-          <span className="text-sm">{i}</span>
-          {hasEntry && (
-            <span className="text-xs text-secondary truncate max-w-[80px]">
-              {entriesByDate.get(dateStr)?.title}
-            </span>
+          <span className="day-number">{i}</span>
+          {entryCount > 0 && (
+            <div className="entry-indicator">
+              <span className="entry-count">{entryCount}</span>
+            </div>
           )}
         </button>
       );
     }
 
-    // Add empty cells for days after the last day of the month
-    for (let i = lastDayOfMonth; i < 6; i++) {
-      days.push(<div key={`empty-end-${i}`} className="calendar-day opacity-0" />);
+    // Add empty cells to complete the grid (6 rows max)
+    const totalCells = days.length;
+    const remainingCells = 42 - totalCells; // 6 rows * 7 days = 42
+    for (let i = 0; i < remainingCells; i++) {
+      days.push(<div key={`empty-end-${i}`} className="calendar-day empty" />);
     }
 
     return days;
-  }, [currentDate, entries, onDateSelect]);
+  }, [currentDate, entries, selectedDate, onDateSelect]);
 
   const previousMonth = () => {
     setCurrentDate(currentDate.subtract(1, 'month'));
@@ -82,51 +95,153 @@ export function Calendar({ entries, onDateSelect }: CalendarProps) {
 
   const goToToday = () => {
     setCurrentDate(dayjs());
+    setSelectedDate(new Date());
+    onDateSelect(new Date());
   };
 
+  const handleClearFilters = () => {
+    setSelectedDate(null);
+    if (onClearFilters) {
+      onClearFilters();
+    }
+  };
+
+  // Month and year data
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+
+  const currentYear = dayjs().year();
+  const years = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
+
+  const handleMonthChange = (monthIndex: number) => {
+    setCurrentDate(currentDate.month(monthIndex));
+    setShowMonthDropdown(false);
+  };
+
+  const handleYearChange = (year: number) => {
+    setCurrentDate(currentDate.year(year));
+    setShowYearDropdown(false);
+  };
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (monthDropdownRef.current && !monthDropdownRef.current.contains(event.target as Node)) {
+        setShowMonthDropdown(false);
+      }
+      if (yearDropdownRef.current && !yearDropdownRef.current.contains(event.target as Node)) {
+        setShowYearDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   return (
-    <div className="bg-surface dark:bg-dark-card rounded-xl shadow-lg p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="calendar-container">
+      {/* Header */}
+      <div className="calendar-header">
+        <button
+          onClick={previousMonth}
+          className="nav-button"
+          aria-label="Previous month"
+        >
+          <RiArrowLeftSLine className="w-4 h-4" />
+        </button>
+        
         <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold text-primary">
-            {currentDate.format('MMMM YYYY')}
-          </h2>
-          <button
-            onClick={goToToday}
-            className="p-1 text-secondary hover:text-primary"
-            title="Go to today"
-          >
-            <RiCalendarLine className="w-5 h-5" />
-          </button>
+          {/* Month Dropdown */}
+          <div className="relative" ref={monthDropdownRef}>
+            <button
+              onClick={() => setShowMonthDropdown(!showMonthDropdown)}
+              className="flex items-center gap-1 px-3 py-1 bg-surface-hover rounded-md text-text-primary hover:bg-surface-hover/80 transition-colors"
+            >
+              <span className="text-sm font-medium">{months[currentDate.month()]}</span>
+              <RiArrowDownSLine className="w-3 h-3" />
+            </button>
+            
+            {showMonthDropdown && (
+              <div className="absolute top-full left-0 mt-1 bg-surface border border-border rounded-md shadow-lg z-10 min-w-[80px] max-h-[300px] overflow-y-auto">
+                {months.map((month, index) => (
+                  <button
+                    key={month}
+                    onClick={() => handleMonthChange(index)}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-surface-hover transition-colors ${
+                      currentDate.month() === index ? 'bg-primary text-white' : 'text-text-primary'
+                    }`}
+                  >
+                    {month}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Year Dropdown */}
+          <div className="relative" ref={yearDropdownRef}>
+            <button
+              onClick={() => setShowYearDropdown(!showYearDropdown)}
+              className="flex items-center gap-1 px-3 py-1 bg-surface-hover rounded-md text-text-primary hover:bg-surface-hover/80 transition-colors"
+            >
+              <span className="text-sm font-medium">{currentDate.year()}</span>
+              <RiArrowDownSLine className="w-3 h-3" />
+            </button>
+            
+            {showYearDropdown && (
+              <div className="absolute top-full left-0 mt-1 bg-surface border border-border rounded-md shadow-lg z-10 min-w-[80px] max-h-[200px] overflow-y-auto">
+                {years.map((year) => (
+                  <button
+                    key={year}
+                    onClick={() => handleYearChange(year)}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-surface-hover transition-colors ${
+                      currentDate.year() === year ? 'bg-primary text-white' : 'text-text-primary'
+                    }`}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={previousMonth}
-            className="p-2 rounded-lg hover:bg-surface-hover text-secondary hover:text-primary"
-          >
-            <RiArrowLeftSLine className="w-5 h-5" />
-          </button>
-          <button
-            onClick={nextMonth}
-            className="p-2 rounded-lg hover:bg-surface-hover text-secondary hover:text-primary"
-          >
-            <RiArrowRightSLine className="w-5 h-5" />
-          </button>
-        </div>
+        
+        <button
+          onClick={nextMonth}
+          className="nav-button"
+          aria-label="Next month"
+        >
+          <RiArrowRightSLine className="w-4 h-4" />
+        </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 mb-2">
+      {/* Days of week */}
+      <div className="days-header">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-          <div
-            key={day}
-            className="text-center text-sm font-medium text-secondary py-2"
-          >
+          <div key={day} className="day-label">
             {day}
           </div>
         ))}
       </div>
 
-      <div className="calendar-grid">{calendarDays}</div>
+      {/* Calendar grid */}
+      <div className="calendar-grid">
+        {calendarDays}
+      </div>
+
+      {/* Footer controls */}
+      <div className="calendar-footer">
+        <button onClick={handleClearFilters} className="footer-button">
+          Clear
+        </button>
+        <button onClick={goToToday} className="footer-button">
+          Today
+        </button>
+      </div>
     </div>
   );
 } 

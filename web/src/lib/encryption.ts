@@ -96,9 +96,9 @@ export async function decryptData(encryptedData: string): Promise<string> {
 
     return decoder.decode(decryptedData);
   } catch (error) {
-    // If web encryption fails, try mobile encryption (simple XOR)
+    // If web encryption fails, try mobile encryption
     try {
-      return decryptMobileData(encryptedData, user.id);
+      return await decryptMobileData(encryptedData, user.id);
     } catch (mobileError) {
       console.error('Failed to decrypt data with both methods:', { web: error, mobile: mobileError });
       throw new Error('Failed to decrypt data');
@@ -106,8 +106,68 @@ export async function decryptData(encryptedData: string): Promise<string> {
   }
 }
 
-// Mobile encryption compatibility
-function generateMobileKey(userId: string): string {
+// Mobile encryption compatibility - Updated to handle new mobile encryption
+async function generateMobileKey(userId: string): Promise<Uint8Array> {
+  try {
+    // Use Web Crypto API to match mobile's SHA-256 key derivation
+    const encoder = new TextEncoder();
+    const data = encoder.encode(userId + 'soul-pages-salt');
+    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+    return new Uint8Array(hashBuffer);
+  } catch (error) {
+    console.error('Error generating mobile key:', error);
+    throw new Error('Failed to generate mobile encryption key');
+  }
+}
+
+async function decryptMobileData(encryptedText: string, userId: string): Promise<string> {
+  try {
+    // Handle the new mobile encryption format
+    
+    // Check for empty string marker
+    if (encryptedText === 'EMPTY_STRING_ENCRYPTED') {
+      return '';
+    }
+    
+    // Get the mobile key (same as mobile generateKey function)
+    const key = await generateMobileKey(userId);
+    
+    // Convert from base64 to binary data
+    const binaryString = atob(encryptedText);
+    const combined = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      combined[i] = binaryString.charCodeAt(i);
+    }
+    
+    // Check if data is too small for new mobile format (needs at least 12 bytes for IV)
+    if (combined.length < 12) {
+      // Try legacy mobile decryption
+      return decryptLegacyMobileData(encryptedText, userId);
+    }
+    
+    const ivBytes = combined.slice(0, 12);
+    const data = combined.slice(12);
+    
+    // Reverse the mobile encryption process (double XOR)
+    const decryptedData = new Uint8Array(data.length);
+    for (let i = 0; i < data.length; i++) {
+      // Reverse: XOR with IV first, then with key
+      const keyByte = key[i % key.length];
+      const ivByte = ivBytes[i % ivBytes.length];
+      decryptedData[i] = data[i] ^ keyByte ^ ivByte;
+    }
+    
+    const decoder = new TextDecoder();
+    return decoder.decode(decryptedData);
+  } catch (error) {
+    console.error('Error in decryptMobileData:', error);
+    // Fallback to legacy mobile decryption
+    return decryptLegacyMobileData(encryptedText, userId);
+  }
+}
+
+// Legacy mobile encryption for backward compatibility
+function generateLegacyMobileKey(userId: string): string {
   let hash = 0;
   for (let i = 0; i < userId.length; i++) {
     const char = userId.charCodeAt(i);
@@ -117,8 +177,8 @@ function generateMobileKey(userId: string): string {
   return Math.abs(hash).toString(16).padStart(8, '0');
 }
 
-function decryptMobileData(encryptedText: string, userId: string): string {
-  const key = generateMobileKey(userId);
+function decryptLegacyMobileData(encryptedText: string, userId: string): string {
+  const key = generateLegacyMobileKey(userId);
   const decoded = atob(encryptedText);
   let result = '';
   for (let i = 0; i < decoded.length; i++) {
