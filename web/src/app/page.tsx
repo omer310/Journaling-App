@@ -316,6 +316,104 @@ export default function Dashboard() {
                 dateRange={dateRange}
                 onDateRangeChange={setDateRange}
               />
+
+              {/* Statistics Dashboard */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-text-primary mb-4">Statistics</h3>
+                <div className="grid grid-cols-1 gap-4">
+                  {/* Total Entries */}
+                  <div className="bg-surface rounded-lg shadow-md p-4 border border-border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium text-text-secondary">Total Entries</p>
+                        <p className="text-lg font-bold text-text-primary">{entries.length}</p>
+                      </div>
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* This Month */}
+                  <div className="bg-surface rounded-lg shadow-md p-4 border border-border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium text-text-secondary">This Month</p>
+                        <p className="text-lg font-bold text-text-primary">
+                          {entries.filter(entry => 
+                            dayjs(entry.date).isSame(dayjs(), 'month')
+                          ).length}
+                        </p>
+                      </div>
+                      <div className="p-2 bg-green-500/10 rounded-lg">
+                        <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Average Words */}
+                  <div className="bg-surface rounded-lg shadow-md p-4 border border-border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium text-text-secondary">Avg Words</p>
+                        <p className="text-lg font-bold text-text-primary">
+                          {entries.length > 0 
+                            ? Math.round(entries.reduce((acc, entry) => 
+                                acc + (entry.content ? entry.content.split(/\s+/).length : 0), 0
+                              ) / entries.length)
+                            : 0
+                          }
+                        </p>
+                      </div>
+                      <div className="p-2 bg-blue-500/10 rounded-lg">
+                        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Most Used Mood */}
+                  <div className="bg-surface rounded-lg shadow-md p-4 border border-border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium text-text-secondary">Top Mood</p>
+                        <p className="text-lg font-bold text-text-primary">
+                          {(() => {
+                            const moodCounts = entries.reduce((acc, entry) => {
+                              if (entry.mood) {
+                                acc[entry.mood] = (acc[entry.mood] || 0) + 1;
+                              }
+                              return acc;
+                            }, {} as Record<string, number>);
+                            
+                            const topMood = Object.entries(moodCounts).sort(([,a], [,b]) => b - a)[0];
+                            
+                            if (!topMood) return '😊';
+                            
+                            const moodEmojis = {
+                              happy: '😊',
+                              neutral: '😐', 
+                              sad: '😢'
+                            };
+                            
+                            return moodEmojis[topMood[0] as keyof typeof moodEmojis] || '😊';
+                          })()}
+                        </p>
+                      </div>
+                      <div className="p-2 bg-yellow-500/10 rounded-lg">
+                        <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Right column: Entries */}
