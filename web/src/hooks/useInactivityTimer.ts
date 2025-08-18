@@ -79,57 +79,37 @@ export function useInactivityTimer({
       warningRef.current = setTimeout(() => {
         if (!isTimerActiveRef.current) return; // Timer was disabled
         
-        // Check if user is still inactive at warning time
-        const currentTime = Date.now();
-        const timeSinceLastActivity = currentTime - lastActivityRef.current;
+        console.log('Inactivity warning triggered');
         
-        if (timeSinceLastActivity >= (timeout - warningTimeMs)) {
-          console.log('Inactivity warning triggered');
+        // Call warning callback if provided
+        if (onWarning) {
+          onWarning();
+        }
+        
+        // Show warning notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+          const notification = new Notification('Soul Pages - Session Timeout', {
+            body: 'You will be automatically signed out due to inactivity in 1 minute. Click to stay logged in.',
+            icon: '/favicon.ico',
+            tag: 'inactivity-warning',
+            requireInteraction: true
+          });
           
-          // Call warning callback if provided
-          if (onWarning) {
-            onWarning();
-          }
-          
-          // Show warning notification
-          if ('Notification' in window && Notification.permission === 'granted') {
-            const notification = new Notification('Soul Pages - Session Timeout', {
-              body: 'You will be automatically signed out due to inactivity in 1 minute. Click to stay logged in.',
-              icon: '/favicon.ico',
-              tag: 'inactivity-warning',
-              requireInteraction: true
-            });
-            
-            // Handle notification click to reset timer
-            notification.onclick = () => {
-              resetTimer();
-              notification.close();
-            };
-          }
-        } else {
-          // User became active again, don't show warning
-          console.log('User became active, canceling warning');
+          // Handle notification click to reset timer
+          notification.onclick = () => {
+            resetTimer();
+            notification.close();
+          };
         }
       }, timeout - warningTimeMs);
     }
 
-    // Set logout timer
+    // Set logout timer - this will execute regardless of activity
     timeoutRef.current = setTimeout(() => {
       if (!isTimerActiveRef.current) return; // Timer was disabled
       
-      // Final check if user is still inactive at logout time
-      const currentTime = Date.now();
-      const timeSinceLastActivity = currentTime - lastActivityRef.current;
-      
-      if (timeSinceLastActivity >= timeout) {
-        console.log('Inactivity timeout - signing out user');
-        performLogout();
-      } else {
-        // User became active again, don't log out
-        console.log('User became active, canceling logout. Time since activity:', timeSinceLastActivity);
-        // Reset the timer since user is active
-        resetTimer();
-      }
+      console.log('Inactivity timeout reached - signing out user');
+      performLogout();
     }, timeout);
   }, [enabled, warningTime, onWarning, clearAllTimers, performLogout]);
 
