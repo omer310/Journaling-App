@@ -12,86 +12,138 @@ const QUOTE_APIS = [
   {
     name: 'zenquotes',
     url: 'https://zenquotes.io/api/random',
-    transform: (data: any): QuoteResponse => ({
-      text: data[0].q,
-      author: data[0].a,
-      category: 'zen',
-      source: 'zenquotes.io'
-    })
+    transform: (data: any): QuoteResponse => {
+      const text = data[0].q;
+      const author = data[0].a;
+      return {
+        text,
+        author,
+        category: isIslamicQuote(text, author) ? 'islamic' : 'zen',
+        source: 'zenquotes.io'
+      };
+    }
   },
   {
     name: 'quotegarden',
     url: 'https://quote-garden.herokuapp.com/api/v3/quotes/random',
-    transform: (data: any): QuoteResponse => ({
-      text: data.data[0].quoteText,
-      author: data.data[0].quoteAuthor,
-      category: 'general',
-      source: 'quotegarden.com'
-    })
+    transform: (data: any): QuoteResponse => {
+      const text = data.data[0].quoteText;
+      const author = data.data[0].quoteAuthor;
+      return {
+        text,
+        author,
+        category: isIslamicQuote(text, author) ? 'islamic' : 'general',
+        source: 'quotegarden.com'
+      };
+    }
   },
   {
     name: 'quotable',
     url: 'https://api.quotable.io/random?maxLength=150',
-    transform: (data: any): QuoteResponse => ({
-      text: data.content,
-      author: data.author,
-      category: data.tags?.[0] || 'general',
-      source: 'quotable.io'
-    })
+    transform: (data: any): QuoteResponse => {
+      const text = data.content;
+      const author = data.author;
+      return {
+        text,
+        author,
+        category: isIslamicQuote(text, author) ? 'islamic' : (data.tags?.[0] || 'general'),
+        source: 'quotable.io'
+      };
+    }
   },
   {
     name: 'quotegarden_wisdom',
     url: 'https://quote-garden.herokuapp.com/api/v3/quotes/random?genre=wisdom',
-    transform: (data: any): QuoteResponse => ({
-      text: data.data[0].quoteText,
-      author: data.data[0].quoteAuthor,
-      category: 'wisdom',
-      source: 'quotegarden.com'
-    })
+    transform: (data: any): QuoteResponse => {
+      const text = data.data[0].quoteText;
+      const author = data.data[0].quoteAuthor;
+      return {
+        text,
+        author,
+        category: isIslamicQuote(text, author) ? 'islamic' : 'wisdom',
+        source: 'quotegarden.com'
+      };
+    }
   },
   {
     name: 'quotegarden_life',
     url: 'https://quote-garden.herokuapp.com/api/v3/quotes/random?genre=life',
-    transform: (data: any): QuoteResponse => ({
-      text: data.data[0].quoteText,
-      author: data.data[0].quoteAuthor,
-      category: 'life',
-      source: 'quotegarden.com'
-    })
+    transform: (data: any): QuoteResponse => {
+      const text = data.data[0].quoteText;
+      const author = data.data[0].quoteAuthor;
+      return {
+        text,
+        author,
+        category: isIslamicQuote(text, author) ? 'islamic' : 'life',
+        source: 'quotegarden.com'
+      };
+    }
   }
 ];
+
+// Helper function to determine if a quote is Islamic
+const isIslamicQuote = (text: string, author: string): boolean => {
+  const islamicKeywords = [
+    'allah', 'quran', 'prophet muhammad', 'hadith', 'islamic', 'muslim', 'islam',
+    'mosque', 'prayer', 'sunnah', 'bismillah', 'inshallah', 'mashallah', 'subhanallah'
+  ];
+  
+  const islamicAuthors = [
+    'prophet muhammad', 'quran', 'hadith', 'rumi', 'al-ghazali', 'ibn sina', 'averroes'
+  ];
+  
+  const textLower = text.toLowerCase();
+  const authorLower = author.toLowerCase();
+  
+  return islamicKeywords.some(keyword => textLower.includes(keyword)) ||
+         islamicAuthors.some(islamicAuthor => authorLower.includes(islamicAuthor)) ||
+         authorLower.includes('ﷺ') || // Prophet Muhammad symbol
+         textLower.includes('verily') && textLower.includes('allah');
+};
 
 // Islamic-specific quote APIs (using wisdom/philosophy from reliable sources)
 const ISLAMIC_QUOTE_APIS = [
   {
     name: 'quotegarden_wisdom',
     url: 'https://quote-garden.herokuapp.com/api/v3/quotes/random?genre=wisdom',
-    transform: (data: any): QuoteResponse => ({
-      text: data.data[0].quoteText,
-      author: data.data[0].quoteAuthor,
-      category: 'islamic',
-      source: 'quotegarden.com'
-    })
+    transform: (data: any): QuoteResponse => {
+      const text = data.data[0].quoteText;
+      const author = data.data[0].quoteAuthor;
+      return {
+        text,
+        author,
+        category: isIslamicQuote(text, author) ? 'islamic' : 'wisdom',
+        source: 'quotegarden.com'
+      };
+    }
   },
   {
     name: 'zenquotes_wisdom',
     url: 'https://zenquotes.io/api/random',
-    transform: (data: any): QuoteResponse => ({
-      text: data[0].q,
-      author: data[0].a,
-      category: 'islamic',
-      source: 'zenquotes.io'
-    })
+    transform: (data: any): QuoteResponse => {
+      const text = data[0].q;
+      const author = data[0].a;
+      return {
+        text,
+        author,
+        category: isIslamicQuote(text, author) ? 'islamic' : 'wisdom',
+        source: 'zenquotes.io'
+      };
+    }
   },
   {
     name: 'quotegarden_life',
     url: 'https://quote-garden.herokuapp.com/api/v3/quotes/random?genre=life',
-    transform: (data: any): QuoteResponse => ({
-      text: data.data[0].quoteText,
-      author: data.data[0].quoteAuthor,
-      category: 'islamic',
-      source: 'quotegarden.com'
-    })
+    transform: (data: any): QuoteResponse => {
+      const text = data.data[0].quoteText;
+      const author = data.data[0].quoteAuthor;
+      return {
+        text,
+        author,
+        category: isIslamicQuote(text, author) ? 'islamic' : 'life',
+        source: 'quotegarden.com'
+      };
+    }
   }
 ];
 
