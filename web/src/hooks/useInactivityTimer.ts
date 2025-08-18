@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
@@ -23,54 +24,82 @@ export function useInactivityTimer({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const warningRef = useRef<NodeJS.Timeout | null>(null);
   const isActiveRef = useRef(false);
+  const lastActivityRef = useRef<number>(Date.now());
+
+  const clearAllTimers = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    if (warningRef.current) {
+      clearTimeout(warningRef.current);
+      warningRef.current = null;
+    }
+  }, []);
 
   const resetTimer = useCallback(() => {
     if (!enabled) return;
 
-    // Clear existing timers
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    if (warningRef.current) {
-      clearTimeout(warningRef.current);
-    }
+    // Clear existing timers first
+    clearAllTimers();
 
     // Update last activity time
+    const now = Date.now();
+    lastActivityRef.current = now;
     updateLastActivityTime();
     isActiveRef.current = true;
 
     const timeout = getInactivityTimeout();
     const warningTimeMs = Math.min(warningTime, timeout - 30000); // Ensure warning is at least 30s before timeout
 
-        // Set warning timer
-    if (warningTimeMs > 0) {
+    console.log('Resetting inactivity timer. Timeout:', timeout, 'Warning time:', warningTimeMs);
+
+    // Set warning timer
+    if (warningTimeMs > 0 && timeout > warningTimeMs) {
       warningRef.current = setTimeout(() => {
-        // Call warning callback if provided
-        if (onWarning) {
-          onWarning();
-        }
+        // Double-check if user is still inactive
+        const currentTime = Date.now();
+        const timeSinceLastActivity = currentTime - lastActivityRef.current;
         
-        // Show warning notification
-        if ('Notification' in window && Notification.permission === 'granted') {
-          const notification = new Notification('Soul Pages - Session Timeout', {
-            body: 'You will be automatically signed out due to inactivity in 1 minute. Click to stay logged in.',
-            icon: '/favicon.ico',
-            tag: 'inactivity-warning',
-            requireInteraction: true
-          });
+        if (timeSinceLastActivity >= (timeout - warningTimeMs)) {
+          console.log('Inactivity warning triggered');
           
-          // Handle notification click to reset timer
-          notification.onclick = () => {
-            resetTimer();
-            notification.close();
-          };
+          // Call warning callback if provided
+          if (onWarning) {
+            onWarning();
+          }
+          
+          // Show warning notification
+          if ('Notification' in window && Notification.permission === 'granted') {
+            const notification = new Notification('Soul Pages - Session Timeout', {
+              body: 'You will be automatically signed out due to inactivity in 1 minute. Click to stay logged in.',
+              icon: '/favicon.ico',
+              tag: 'inactivity-warning',
+              requireInteraction: true
+            });
+            
+            // Handle notification click to reset timer
+            notification.onclick = () => {
+              resetTimer();
+              notification.close();
+            };
+          }
+        } else {
+          // User became active again, don't show warning
+          console.log('User became active, canceling warning');
         }
       }, timeout - warningTimeMs);
     }
 
     // Set logout timer
     timeoutRef.current = setTimeout(async () => {
-      if (isActiveRef.current) {
+      // Double-check if user is still inactive
+      const currentTime = Date.now();
+      const timeSinceLastActivity = currentTime - lastActivityRef.current;
+      
+      if (timeSinceLastActivity >= timeout && isActiveRef.current) {
+        console.log('Inactivity timeout - signing out user');
+        
         // Call custom timeout handler if provided
         if (onTimeout) {
           onTimeout();
@@ -88,17 +117,33 @@ export function useInactivityTimer({
         }
         
         isActiveRef.current = false;
+      } else {
+        // User became active again, don't log out
+        console.log('User became active, canceling logout. Time since activity:', timeSinceLastActivity);
       }
     }, timeout);
-  }, [enabled, onTimeout, warningTime]);
+  }, [enabled, onTimeout, warningTime, onWarning, clearAllTimers]);
 
   const handleUserActivity = useCallback(() => {
     if (!enabled) return;
-    resetTimer();
+    
+    const now = Date.now();
+    const timeSinceLastActivity = now - lastActivityRef.current;
+    
+    // Only reset if enough time has passed to avoid excessive resets
+    if (timeSinceLastActivity > 5000) { // 5 seconds threshold
+      console.log('User activity detected, resetting timer');
+      resetTimer();
+    } else {
+      // Just update the last activity time without resetting timers
+      lastActivityRef.current = now;
+      updateLastActivityTime();
+    }
   }, [enabled, resetTimer]);
 
   useEffect(() => {
     if (!enabled) {
+      clearAllTimers();
       return;
     }
 
@@ -113,13 +158,14 @@ export function useInactivityTimer({
       'focus'
     ];
 
+    // Add event listeners with passive option for better performance
     events.forEach(event => {
       document.addEventListener(event, handleUserActivity, { passive: true });
     });
 
     // Initial timer setup - start fresh when user logs in
     // Add a small delay to ensure user has time to interact
-    setTimeout(() => {
+    const initialTimer = setTimeout(() => {
       resetTimer();
     }, 1000);
 
@@ -129,31 +175,24 @@ export function useInactivityTimer({
     }
 
     return () => {
+      // Clear initial timer
+      clearTimeout(initialTimer);
+      
       // Clean up event listeners
       events.forEach(event => {
         document.removeEventListener(event, handleUserActivity);
       });
 
       // Clear timers
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      if (warningRef.current) {
-        clearTimeout(warningRef.current);
-      }
+      clearAllTimers();
     };
-  }, [enabled, handleUserActivity, resetTimer]);
+  }, [enabled, handleUserActivity, resetTimer, clearAllTimers]);
 
   // Expose methods for manual control
   const pauseTimer = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    if (warningRef.current) {
-      clearTimeout(warningRef.current);
-    }
+    clearAllTimers();
     isActiveRef.current = false;
-  }, []);
+  }, [clearAllTimers]);
 
   const resumeTimer = useCallback(() => {
     if (enabled) {
@@ -167,4 +206,4 @@ export function useInactivityTimer({
     resumeTimer,
     isActive: isActiveRef.current
   };
-} 
+}
