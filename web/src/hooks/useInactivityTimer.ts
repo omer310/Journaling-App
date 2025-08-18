@@ -52,12 +52,18 @@ export function useInactivityTimer({
         
         // Show warning notification
         if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('Soul Pages - Session Timeout', {
+          const notification = new Notification('Soul Pages - Session Timeout', {
             body: 'You will be automatically signed out due to inactivity in 1 minute. Click to stay logged in.',
             icon: '/favicon.ico',
             tag: 'inactivity-warning',
             requireInteraction: true
           });
+          
+          // Handle notification click to reset timer
+          notification.onclick = () => {
+            resetTimer();
+            notification.close();
+          };
         }
       }, timeout - warningTimeMs);
     }
@@ -70,7 +76,15 @@ export function useInactivityTimer({
           onTimeout();
         } else {
           // Default behavior: sign out
-          await supabase.auth.signOut();
+          try {
+            await supabase.auth.signOut();
+            // Force redirect to login page
+            window.location.href = '/login?reason=Session expired due to inactivity';
+          } catch (error) {
+            console.error('Auto-logout error:', error);
+            // Force redirect even if signOut fails
+            window.location.href = '/login?reason=Session expired due to inactivity';
+          }
         }
         
         isActiveRef.current = false;
