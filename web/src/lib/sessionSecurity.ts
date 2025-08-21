@@ -1,21 +1,21 @@
 import { rateLimitUtils } from './rateLimiter';
 
-// Session security configuration
+// Session security configuration - VERY SECURE for privacy
 export const SESSION_CONFIG = {
-  // Session timeout (30 minutes)
-  SESSION_TIMEOUT_MS: 30 * 60 * 1000,
+  // Session timeout (5 minutes maximum for security)
+  SESSION_TIMEOUT_MS: 5 * 60 * 1000,
   
-  // Refresh token before expiry (5 minutes)
-  REFRESH_BEFORE_EXPIRY_MS: 5 * 60 * 1000,
+  // Refresh token before expiry (1 minute)
+  REFRESH_BEFORE_EXPIRY_MS: 1 * 60 * 1000,
   
-  // Maximum session age (24 hours)
-  MAX_SESSION_AGE_MS: 24 * 60 * 60 * 1000,
+  // Maximum session age (30 minutes absolute maximum)
+  MAX_SESSION_AGE_MS: 30 * 60 * 1000,
   
-  // Inactivity timeout (15 minutes)
-  INACTIVITY_TIMEOUT_MS: 15 * 60 * 1000,
+  // Inactivity timeout (5 minutes maximum)
+  INACTIVITY_TIMEOUT_MS: 5 * 60 * 1000,
   
-  // Session validation interval (1 minute)
-  VALIDATION_INTERVAL_MS: 60 * 1000,
+  // Session validation interval (30 seconds for aggressive checking)
+  VALIDATION_INTERVAL_MS: 30 * 1000,
 } as const;
 
 // Session state interface

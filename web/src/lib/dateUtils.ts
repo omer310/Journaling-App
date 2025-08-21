@@ -186,12 +186,16 @@ export function updateLastActivityTime(): void {
 }
 
 export function getInactivityTimeout(): number {
-  // Default to 15 minutes (900000 ms) for better security, but can be configured
-  return parseInt(localStorage.getItem('inactivityTimeout') || '900000');
+  // Default to 15 minutes (900000 ms) for good balance of security and usability
+  const timeout = parseInt(localStorage.getItem('inactivityTimeout') || '900000');
+  // Enforce maximum of 15 minutes (900000 ms) for security
+  return Math.min(timeout, 900000);
 }
 
 export function setInactivityTimeout(timeoutMs: number): void {
-  localStorage.setItem('inactivityTimeout', timeoutMs.toString());
+  // Enforce maximum of 15 minutes (900000 ms) for security
+  const secureTimeout = Math.min(timeoutMs, 900000);
+  localStorage.setItem('inactivityTimeout', secureTimeout.toString());
 }
 
 export function checkInactivity(): boolean {
@@ -206,8 +210,8 @@ export function clearInactivityData(): void {
   localStorage.removeItem('lastActivityTime');
 }
 
-// Browser close detection utilities
-export function setupBrowserCloseDetection(): void {
+// SMART session security - activity-aware logout protection
+export function setupSmartSessionSecurity(): void {
   // Generate a unique session fingerprint
   const sessionFingerprint = generateSessionFingerprint();
   const sessionStartTime = Date.now();
@@ -215,93 +219,127 @@ export function setupBrowserCloseDetection(): void {
   localStorage.setItem('sessionStartTime', sessionStartTime.toString());
   localStorage.setItem('sessionFingerprint', sessionFingerprint);
   
-  // Check if this is a fresh page load by comparing with previous session
-  const lastSessionFingerprint = localStorage.getItem('lastSessionFingerprint');
-  const lastSessionStart = localStorage.getItem('lastSessionStart');
-  
-  // If we have a previous session but sessionStorage is empty, browser was closed
-  if (lastSessionFingerprint && lastSessionFingerprint !== sessionFingerprint) {
-    // Check if sessionStorage was cleared (indicates browser close)
-    const sessionKey = `session_${lastSessionFingerprint}`;
-    const sessionExists = sessionStorage.getItem(sessionKey);
-    
-    if (!sessionExists) {
-      // Previous session exists but sessionStorage was cleared - browser was closed
-      localStorage.setItem('browserClosed', Date.now().toString());
-    }
-  }
-  
   // Store current session in sessionStorage
   const sessionKey = `session_${sessionFingerprint}`;
   sessionStorage.setItem(sessionKey, 'active');
-  
-  // Store a flag that indicates the browser was closed
-  const handleBeforeUnload = () => {
-    localStorage.setItem('browserClosed', Date.now().toString());
-    localStorage.setItem('lastSessionStart', sessionStartTime.toString());
-    localStorage.setItem('lastSessionFingerprint', sessionFingerprint);
-    // Clear session restored flag when browser is actually closed
-    localStorage.removeItem('sessionRestored');
+
+  // Track user activity and tab switching
+  let lastActivityTime = Date.now();
+  let tabSwitchTimeout: NodeJS.Timeout | null = null;
+  let isUserActive = true;
+
+  // Update activity timestamp
+  const updateActivity = () => {
+    lastActivityTime = Date.now();
+    isUserActive = true;
+    updateLastActivityTime(); // Update the global activity tracker
   };
 
-  const handlePageHide = () => {
-    localStorage.setItem('browserClosed', Date.now().toString());
-    localStorage.setItem('lastSessionStart', sessionStartTime.toString());
-    localStorage.setItem('lastSessionFingerprint', sessionFingerprint);
-    // Clear session restored flag when browser is actually closed
-    localStorage.removeItem('sessionRestored');
-  };
-
-  // Add visibility change detection
-  const handleVisibilityChange = () => {
-    if (document.hidden) {
-      // Page became hidden - could be tab switch or browser close
-      localStorage.setItem('pageHidden', Date.now().toString());
-    } else {
-      // Page became visible again
-      const pageHidden = localStorage.getItem('pageHidden');
-      if (pageHidden) {
-        const hiddenTime = parseInt(pageHidden);
-        const now = Date.now();
-        // If page was hidden for more than 10 seconds, likely browser was closed
-        if ((now - hiddenTime) > 10000) {
-          localStorage.setItem('browserClosed', Date.now().toString());
-        }
-        localStorage.removeItem('pageHidden');
-      }
-    }
-  };
-
-  // Add unload detection for better production reliability
-  const handleUnload = () => {
-    // Use sendBeacon for more reliable data transmission in production
+  // Security logout function
+  const forceSecurityLogout = (reason: string) => {
+    console.log(`SECURITY: Logout triggered - ${reason}`);
+    
+    // Clear all session data immediately
+    clearAllSessionData();
+    
+    // Use sendBeacon for reliable logout signal
     if (navigator.sendBeacon) {
       const data = JSON.stringify({
-        type: 'browser_close',
+        type: 'security_logout',
         timestamp: Date.now(),
-        sessionFingerprint: sessionFingerprint
+        sessionFingerprint: sessionFingerprint,
+        reason: reason
       });
-      navigator.sendBeacon('/api/browser-close', data);
+      navigator.sendBeacon('/api/auth/logout', data);
     }
     
-    localStorage.setItem('browserClosed', Date.now().toString());
-    localStorage.setItem('lastSessionStart', sessionStartTime.toString());
-    localStorage.setItem('lastSessionFingerprint', sessionFingerprint);
-    localStorage.removeItem('sessionRestored');
+    // Force redirect to login with security message
+    window.location.href = `/login?reason=Session terminated for security: ${encodeURIComponent(reason)}`;
   };
 
-  // Add event listeners
+  // SMART: Tab switching with grace period
+  const handleVisibilityChange = () => {
+    if (document.hidden) {
+      // Start a grace period timer when tab becomes hidden
+      tabSwitchTimeout = setTimeout(() => {
+        // Only logout if user hasn't returned and was inactive before switching
+        const timeSinceActivity = Date.now() - lastActivityTime;
+        if (timeSinceActivity > 30000) { // 30 seconds of inactivity before tab switch
+          forceSecurityLogout('Tab switched after period of inactivity');
+        }
+      }, 60000); // 1-minute grace period for tab switching
+    } else {
+      // User returned to tab - cancel logout timer and update activity
+      if (tabSwitchTimeout) {
+        clearTimeout(tabSwitchTimeout);
+        tabSwitchTimeout = null;
+      }
+      updateActivity();
+    }
+  };
+
+  // SMART: Only logout on window blur if user has been inactive
+  const handleWindowBlur = () => {
+    const timeSinceActivity = Date.now() - lastActivityTime;
+    // Only logout if user has been inactive for more than 2 minutes
+    if (timeSinceActivity > 120000) {
+      forceSecurityLogout('Window lost focus after period of inactivity');
+    }
+  };
+
+  // SECURE: Clear data on actual navigation/close
+  const handleBeforeUnload = () => {
+    // Clear all data on actual page unload
+    clearAllSessionData();
+  };
+
+  // SECURE: Clear data on page hide (browser close)
+  const handlePageHide = () => {
+    clearAllSessionData();
+  };
+
+  // SECURE: Clear data on unload (browser close)
+  const handleUnload = () => {
+    clearAllSessionData();
+  };
+
+  // Track user activity to keep them logged in while active
+  const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+  
+  const handleUserActivity = () => {
+    updateActivity();
+  };
+
+  // Add activity listeners
+  activityEvents.forEach(event => {
+    document.addEventListener(event, handleUserActivity, true);
+  });
+
+  // Add security event listeners
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('blur', handleWindowBlur);
   window.addEventListener('beforeunload', handleBeforeUnload);
   window.addEventListener('pagehide', handlePageHide);
   window.addEventListener('unload', handleUnload);
-  document.addEventListener('visibilitychange', handleVisibilityChange);
 
   // Store cleanup function
-  (window as any).__browserCloseCleanup = () => {
+  (window as any).__smartSecurityCleanup = () => {
+    // Clear timers
+    if (tabSwitchTimeout) {
+      clearTimeout(tabSwitchTimeout);
+    }
+    
+    // Remove activity listeners
+    activityEvents.forEach(event => {
+      document.removeEventListener(event, handleUserActivity, true);
+    });
+    
+    // Remove security listeners
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('blur', handleWindowBlur);
     window.removeEventListener('beforeunload', handleBeforeUnload);
     window.removeEventListener('pagehide', handlePageHide);
     window.removeEventListener('unload', handleUnload);
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
   };
 }
 
@@ -310,60 +348,48 @@ function generateSessionFingerprint(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
-export function cleanupBrowserCloseDetection(): void {
-  if ((window as any).__browserCloseCleanup) {
-    (window as any).__browserCloseCleanup();
+export function cleanupSmartSessionSecurity(): void {
+  if ((window as any).__smartSecurityCleanup) {
+    (window as any).__smartSecurityCleanup();
   }
 }
 
-export function checkBrowserWasClosed(): boolean {
-  const browserClosed = localStorage.getItem('browserClosed');
-  const lastSessionStart = localStorage.getItem('lastSessionStart');
-  const currentSessionStart = localStorage.getItem('sessionStartTime');
-  const lastSessionFingerprint = localStorage.getItem('lastSessionFingerprint');
-  const currentSessionFingerprint = localStorage.getItem('sessionFingerprint');
+// Clear all session data for maximum security
+export function clearAllSessionData(): void {
+  // Clear localStorage
+  localStorage.removeItem('lastActivityTime');
+  localStorage.removeItem('sessionStartTime');
+  localStorage.removeItem('sessionFingerprint');
+  localStorage.removeItem('inactivityTimeout');
+  localStorage.removeItem('browserClosed');
+  localStorage.removeItem('lastSessionStart');
+  localStorage.removeItem('lastSessionFingerprint');
+  localStorage.removeItem('sessionRestored');
+  localStorage.removeItem('pageHidden');
   
-  // If no browser close flag exists, browser wasn't closed
-  if (!browserClosed) return false;
+  // Clear sessionStorage completely
+  sessionStorage.clear();
   
-  // Check if this is a session restoration (same session continuing)
-  const sessionRestored = localStorage.getItem('sessionRestored');
-  if (sessionRestored === 'true') {
-    return false;
-  }
-  
-  // Check if sessionStorage was cleared (indicates browser close)
-  if (lastSessionFingerprint && currentSessionFingerprint && lastSessionFingerprint !== currentSessionFingerprint) {
-    const sessionKey = `session_${lastSessionFingerprint}`;
-    const sessionExists = sessionStorage.getItem(sessionKey);
-    if (!sessionExists) {
-      return true;
+  // Clear any other sensitive data that might be stored
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && (key.includes('session') || key.includes('auth') || key.includes('token'))) {
+      keysToRemove.push(key);
     }
   }
-  
-  // If session fingerprints don't match, this is a new session after browser close
-  if (lastSessionFingerprint && currentSessionFingerprint && lastSessionFingerprint !== currentSessionFingerprint) {
-    return true;
-  }
-  
-  // If session start times don't match, this is a new session after browser close
-  if (lastSessionStart && currentSessionStart && lastSessionStart !== currentSessionStart) {
-    return true;
-  }
-  
-  const closedTime = parseInt(browserClosed);
-  const now = Date.now();
-  
-  // Only consider it a browser close if it was closed more than 3 seconds ago
-  // Reduced from 5 seconds for better production reliability
-  if ((now - closedTime) > 3000) {
-    return true;
-  }
-  
+  keysToRemove.forEach(key => localStorage.removeItem(key));
+}
+
+// Legacy browser close detection - DEPRECATED in favor of aggressive security
+// These functions are kept for compatibility but should not be used
+export function checkBrowserWasClosed(): boolean {
+  // Always return false - we now use aggressive security instead
   return false;
 }
 
 export function clearBrowserCloseFlag(): void {
+  // Clear old flags for cleanup
   localStorage.removeItem('browserClosed');
   localStorage.removeItem('lastSessionStart');
   localStorage.removeItem('lastSessionFingerprint');

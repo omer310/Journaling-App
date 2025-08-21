@@ -8,9 +8,9 @@ import { setupRealtimeSubscription, cleanupRealtimeSubscription } from '@/store/
 import { useInactivityTimer } from '@/hooks/useInactivityTimer';
 import { 
   clearInactivityData, 
-  setupBrowserCloseDetection, 
-  cleanupBrowserCloseDetection,
-  checkBrowserWasClosed,
+  setupSmartSessionSecurity, 
+  cleanupSmartSessionSecurity,
+  clearAllSessionData,
   clearBrowserCloseFlag
 } from '@/lib/dateUtils';
 
@@ -45,51 +45,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    // Set up browser close detection
-    setupBrowserCloseDetection();
-
-    // More aggressive browser close check for production
-    const checkForBrowserClose = () => {
-      if (checkBrowserWasClosed() && window.location.pathname !== '/login') {
-        console.log('Browser was closed - forcing logout for security');
-        
-        // Clear all session data immediately
-        clearInactivityData();
-        clearBrowserCloseFlag();
-        
-        // Force logout and redirect immediately
-        const forceLogout = async () => {
-          try {
-            await supabase.auth.signOut();
-          } catch (error) {
-            console.error('Error during forced logout:', error);
-          } finally {
-            // Always redirect, even if logout fails
-            window.location.href = '/login?reason=Browser was closed - session terminated for security';
-          }
-        };
-        
-        forceLogout();
-        return true; // Indicate that logout was triggered
-      }
-      return false;
-    };
-
-    // Check immediately
-    if (checkForBrowserClose()) {
-      return; // Don't continue with normal session initialization
-    }
-
-    // Also check after a short delay to catch edge cases
-    const delayedCheck = setTimeout(() => {
-      if (!browserCloseCheckedRef.current && checkForBrowserClose()) {
-        return;
-      }
-      browserCloseCheckedRef.current = true;
-    }, 1000);
-
-    // Mark that we've checked for browser close
-    browserCloseCheckedRef.current = true;
+    // Set up SMART session security - activity-aware logout protection
+    setupSmartSessionSecurity();
+    
+    // Clean up any old browser close flags
+    clearBrowserCloseFlag();
 
     // Debounce session checks to prevent excessive API calls
     let sessionCheckTimeout: NodeJS.Timeout;
@@ -213,12 +173,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (sessionCheckTimeout) {
         clearTimeout(sessionCheckTimeout);
       }
-      if (delayedCheck) {
-        clearTimeout(delayedCheck);
-      }
       subscription.unsubscribe();
       cleanupRealtimeSubscription();
-      cleanupBrowserCloseDetection();
+      cleanupSmartSessionSecurity();
     };
   }, []);
 

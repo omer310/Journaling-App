@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getInactivityTimeout, setInactivityTimeout } from '@/lib/dateUtils';
-import { RiShieldLine, RiTimeLine, RiLogoutBoxLine } from 'react-icons/ri';
+import { RiShieldLine, RiShieldCheckLine, RiTimeLine, RiLogoutBoxLine } from 'react-icons/ri';
 
 interface SessionSecuritySettingsProps {
   className?: string;
@@ -11,7 +11,6 @@ interface SessionSecuritySettingsProps {
 export default function SessionSecuritySettings({ className = '' }: SessionSecuritySettingsProps) {
   const [timeoutMinutes, setTimeoutMinutes] = useState(15);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
 
   useEffect(() => {
     // Load current timeout setting
@@ -34,10 +33,9 @@ export default function SessionSecuritySettings({ className = '' }: SessionSecur
 
 
   const timeoutOptions = [
-    { value: 5, label: '5 minutes', description: 'Most secure - logs out quickly' },
-    { value: 15, label: '15 minutes', description: 'Recommended - good balance' },
-    { value: 30, label: '30 minutes', description: 'Less secure - longer session' },
-    { value: 60, label: '1 hour', description: 'Not recommended for sensitive content' }
+    { value: 5, label: '5 minutes', description: 'High security - quick inactivity logout' },
+    { value: 10, label: '10 minutes', description: 'Balanced - moderate inactivity timeout' },
+    { value: 15, label: '15 minutes', description: 'Recommended - good balance of security and usability' }
   ];
 
   return (
@@ -84,11 +82,31 @@ export default function SessionSecuritySettings({ className = '' }: SessionSecur
         </div>
       </div>
 
+      {/* SMART Security Information */}
+      <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+        <div className="flex items-start gap-3">
+          <RiShieldCheckLine className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <h4 className="font-medium text-green-800 mb-2">Smart Privacy Protection Active</h4>
+            <ul className="text-sm text-green-700 space-y-1">
+              <li>• <strong>Stay logged in while active</strong> - no interruption while journaling</li>
+              <li>• <strong>Smart tab switching</strong> - 1-minute grace period to return</li>
+              <li>• <strong>Activity tracking</strong> - extends session when you're typing/clicking</li>
+              <li>• <strong>Secure browser close</strong> - immediate logout when browser closes</li>
+              <li>• <strong>Inactivity timeout</strong> - logout only after true inactivity</li>
+            </ul>
+            <p className="text-xs text-green-600 mt-2 font-medium">
+              Perfect balance: Maximum privacy protection without interrupting your journaling flow.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Security Information */}
       <div className="bg-background border border-border rounded-lg p-4 mb-6">
-        <h4 className="font-medium text-text-primary mb-2">Security Features</h4>
+        <h4 className="font-medium text-text-primary mb-2">Additional Security Features</h4>
         <ul className="text-sm text-text-secondary space-y-1">
-          <li>• Automatic logout when browser is closed</li>
+          <li>• All sensitive data cleared from browser storage</li>
           <li>• Session timeout on inactivity</li>
           <li>• Secure session validation</li>
           <li>• Activity monitoring and logging</li>
@@ -125,20 +143,10 @@ export default function SessionSecuritySettings({ className = '' }: SessionSecur
             <h4 className="font-medium text-text-primary mb-3">Advanced Security Options</h4>
             
             <div className="space-y-3">
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="rounded"
-                />
-                <div>
-                  <div className="text-sm font-medium text-text-primary">Remember Me</div>
-                  <div className="text-xs text-text-secondary">
-                    Keep me logged in for longer periods (less secure)
-                  </div>
-                </div>
-              </label>
+              <div className="text-sm text-text-secondary">
+                <p><strong>Note:</strong> "Remember Me" functionality has been disabled for maximum security.</p>
+                <p>All sessions are now limited to 5 minutes maximum for privacy protection.</p>
+              </div>
               
               <div className="text-xs text-text-secondary">
                 <strong>Note:</strong> These settings affect your privacy and security. 

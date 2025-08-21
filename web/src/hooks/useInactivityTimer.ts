@@ -5,9 +5,7 @@ import {
   getLastActivityTime, 
   updateLastActivityTime, 
   getInactivityTimeout, 
-  checkInactivity,
-  checkBrowserWasClosed,
-  clearBrowserCloseFlag
+  checkInactivity
 } from '@/lib/dateUtils';
 
 interface UseInactivityTimerOptions {
@@ -77,13 +75,7 @@ export function useInactivityTimer({
     const timeout = getInactivityTimeout();
     const warningTimeMs = Math.min(warningTime, timeout - 30000); // Ensure warning is at least 30s before timeout
 
-    // Set up browser close detection check
-    browserCloseCheckRef.current = setInterval(() => {
-      if (checkBrowserWasClosed()) {
-        clearBrowserCloseFlag();
-        performLogout();
-      }
-    }, 5000); // Check every 5 seconds
+    // Browser close detection is now handled by aggressive security system
 
     // Set warning timer
     if (warningTimeMs > 0 && timeout > warningTimeMs) {

@@ -4,6 +4,31 @@ import { cookies } from 'next/headers';
 
 export async function POST(request: NextRequest) {
   try {
+    // Parse request body once and handle both regular and security logout
+    let body: any = {};
+    let logoutReason = 'user_initiated';
+    let sessionFingerprint = null;
+    let userId = null;
+    let sessionStart = null;
+    
+    try {
+      body = await request.json();
+      
+      if (body.type === 'security_logout') {
+        // Security logout via beacon
+        logoutReason = body.reason || 'security_logout';
+        sessionFingerprint = body.sessionFingerprint;
+        console.log(`SECURITY: Logout triggered - ${logoutReason}`);
+      } else {
+        // Regular logout
+        userId = body.userId;
+        sessionStart = body.sessionStart;
+      }
+    } catch (error) {
+      // If body parsing fails, treat as regular logout without body data
+      console.log('No body data provided for logout');
+    }
+
     const cookieStore = await cookies();
     
     const supabase = createServerClient(
@@ -29,58 +54,82 @@ export async function POST(request: NextRequest) {
       }
     );
     
-    // Get the request body
-    const { userId, sessionStart } = await request.json();
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Missing user ID' },
-        { status: 400 }
-      );
+    // For security logout, get user from session since we don't have userId in body
+    if (body.type === 'security_logout') {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        userId = session.user.id;
+      }
     }
+    
+    // We'll check for userId again after getting session data
 
-    // Get current session
+    // Get current session (needed for both security and regular logout)
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
-    if (sessionError || !session) {
+    // For security logout, we might not have a session if it was already cleared
+    if (body.type !== 'security_logout' && (sessionError || !session)) {
       return NextResponse.json(
         { error: 'No valid session found' },
         { status: 401 }
       );
     }
+    
+    // Update userId from session if we have one (for security logout)
+    if (session?.user && !userId) {
+      userId = session.user.id;
+    }
 
-    // Verify the session belongs to the claimed user
-    if (session.user.id !== userId) {
+    // Final check for userId
+    if (!userId) {
+      // For security logout, we can still proceed to clear session even without userId
+      if (body.type === 'security_logout') {
+        console.log('Security logout proceeding without userId - clearing session anyway');
+      } else {
+        return NextResponse.json(
+          { error: 'Missing user ID' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Verify the session belongs to the claimed user (if we have both)
+    if (session?.user && userId && session.user.id !== userId) {
       return NextResponse.json(
         { error: 'Session user mismatch' },
         { status: 403 }
       );
     }
 
-    // Log the logout event for security monitoring
-    await supabase
-      .from('security_events')
-      .insert({
-        user_id: userId,
-        event_type: 'LOGOUT',
-        details: {
-          ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-          user_agent: request.headers.get('user-agent'),
-          session_duration: sessionStart ? Date.now() - new Date(sessionStart).getTime() : null,
-          logout_reason: 'user_initiated'
-        },
-        severity: 'LOW'
-      });
+    // Log the logout event for security monitoring (only if we have userId)
+    if (userId) {
+      await supabase
+        .from('security_events')
+        .insert({
+          user_id: userId,
+          event_type: 'LOGOUT',
+          details: {
+            ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+            user_agent: request.headers.get('user-agent'),
+            session_duration: sessionStart ? Date.now() - new Date(sessionStart).getTime() : null,
+            logout_reason: logoutReason,
+            session_fingerprint: sessionFingerprint
+          },
+          severity: logoutReason.includes('security') ? 'MEDIUM' : 'LOW'
+        });
 
-    // Invalidate the session in our tracking table
-    await supabase
-      .from('user_sessions')
-      .update({ 
-        active: false,
-        ended_at: new Date().toISOString()
-      })
-      .eq('user_id', userId)
-      .eq('session_id', session.access_token);
+      // Invalidate the session in our tracking table
+      if (session?.access_token) {
+        await supabase
+          .from('user_sessions')
+          .update({ 
+            active: false,
+            ended_at: new Date().toISOString()
+          })
+          .eq('user_id', userId)
+          .eq('session_id', session.access_token);
+      }
+    }
 
     // Sign out the user
     const { error: signOutError } = await supabase.auth.signOut();
