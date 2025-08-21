@@ -215,22 +215,25 @@ export function setupBrowserCloseDetection(): void {
   localStorage.setItem('sessionStartTime', sessionStartTime.toString());
   localStorage.setItem('sessionFingerprint', sessionFingerprint);
   
-  // Use sessionStorage to detect if this is a fresh page load
-  // sessionStorage is cleared when the browser/tab is closed
-  const sessionKey = `session_${sessionFingerprint}`;
-  const existingSession = sessionStorage.getItem(sessionKey);
+  // Check if this is a fresh page load by comparing with previous session
+  const lastSessionFingerprint = localStorage.getItem('lastSessionFingerprint');
+  const lastSessionStart = localStorage.getItem('lastSessionStart');
   
-     if (!existingSession) {
-     // This is a fresh session - check if we have a previous session in localStorage
-     const lastSessionFingerprint = localStorage.getItem('lastSessionFingerprint');
-     if (lastSessionFingerprint && lastSessionFingerprint !== sessionFingerprint) {
-       // Previous session exists but sessionStorage was cleared - browser was closed
-       localStorage.setItem('browserClosed', Date.now().toString());
-     }
+  // If we have a previous session but sessionStorage is empty, browser was closed
+  if (lastSessionFingerprint && lastSessionFingerprint !== sessionFingerprint) {
+    // Check if sessionStorage was cleared (indicates browser close)
+    const sessionKey = `session_${lastSessionFingerprint}`;
+    const sessionExists = sessionStorage.getItem(sessionKey);
     
-    // Store current session in sessionStorage
-    sessionStorage.setItem(sessionKey, 'active');
+    if (!sessionExists) {
+      // Previous session exists but sessionStorage was cleared - browser was closed
+      localStorage.setItem('browserClosed', Date.now().toString());
+    }
   }
+  
+  // Store current session in sessionStorage
+  const sessionKey = `session_${sessionFingerprint}`;
+  sessionStorage.setItem(sessionKey, 'active');
   
   // Store a flag that indicates the browser was closed
   const handleBeforeUnload = () => {
@@ -260,24 +263,44 @@ export function setupBrowserCloseDetection(): void {
       if (pageHidden) {
         const hiddenTime = parseInt(pageHidden);
         const now = Date.now();
-                 // If page was hidden for more than 10 seconds, likely browser was closed
-         if ((now - hiddenTime) > 10000) {
-           localStorage.setItem('browserClosed', Date.now().toString());
-         }
+        // If page was hidden for more than 10 seconds, likely browser was closed
+        if ((now - hiddenTime) > 10000) {
+          localStorage.setItem('browserClosed', Date.now().toString());
+        }
         localStorage.removeItem('pageHidden');
       }
     }
   };
 
+  // Add unload detection for better production reliability
+  const handleUnload = () => {
+    // Use sendBeacon for more reliable data transmission in production
+    if (navigator.sendBeacon) {
+      const data = JSON.stringify({
+        type: 'browser_close',
+        timestamp: Date.now(),
+        sessionFingerprint: sessionFingerprint
+      });
+      navigator.sendBeacon('/api/browser-close', data);
+    }
+    
+    localStorage.setItem('browserClosed', Date.now().toString());
+    localStorage.setItem('lastSessionStart', sessionStartTime.toString());
+    localStorage.setItem('lastSessionFingerprint', sessionFingerprint);
+    localStorage.removeItem('sessionRestored');
+  };
+
   // Add event listeners
   window.addEventListener('beforeunload', handleBeforeUnload);
   window.addEventListener('pagehide', handlePageHide);
+  window.addEventListener('unload', handleUnload);
   document.addEventListener('visibilitychange', handleVisibilityChange);
 
   // Store cleanup function
   (window as any).__browserCloseCleanup = () => {
     window.removeEventListener('beforeunload', handleBeforeUnload);
     window.removeEventListener('pagehide', handlePageHide);
+    window.removeEventListener('unload', handleUnload);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
   };
 }
@@ -303,39 +326,39 @@ export function checkBrowserWasClosed(): boolean {
   // If no browser close flag exists, browser wasn't closed
   if (!browserClosed) return false;
   
-     // Check if this is a session restoration (same session continuing)
-   const sessionRestored = localStorage.getItem('sessionRestored');
-   if (sessionRestored === 'true') {
-     return false;
-   }
+  // Check if this is a session restoration (same session continuing)
+  const sessionRestored = localStorage.getItem('sessionRestored');
+  if (sessionRestored === 'true') {
+    return false;
+  }
   
-     // Check if sessionStorage was cleared (indicates browser close)
-   if (lastSessionFingerprint && currentSessionFingerprint && lastSessionFingerprint !== currentSessionFingerprint) {
-     const sessionKey = `session_${lastSessionFingerprint}`;
-     const sessionExists = sessionStorage.getItem(sessionKey);
-     if (!sessionExists) {
-       return true;
-     }
-   }
+  // Check if sessionStorage was cleared (indicates browser close)
+  if (lastSessionFingerprint && currentSessionFingerprint && lastSessionFingerprint !== currentSessionFingerprint) {
+    const sessionKey = `session_${lastSessionFingerprint}`;
+    const sessionExists = sessionStorage.getItem(sessionKey);
+    if (!sessionExists) {
+      return true;
+    }
+  }
   
-     // If session fingerprints don't match, this is a new session after browser close
-   if (lastSessionFingerprint && currentSessionFingerprint && lastSessionFingerprint !== currentSessionFingerprint) {
-     return true;
-   }
+  // If session fingerprints don't match, this is a new session after browser close
+  if (lastSessionFingerprint && currentSessionFingerprint && lastSessionFingerprint !== currentSessionFingerprint) {
+    return true;
+  }
   
-     // If session start times don't match, this is a new session after browser close
-   if (lastSessionStart && currentSessionStart && lastSessionStart !== currentSessionStart) {
-     return true;
-   }
+  // If session start times don't match, this is a new session after browser close
+  if (lastSessionStart && currentSessionStart && lastSessionStart !== currentSessionStart) {
+    return true;
+  }
   
   const closedTime = parseInt(browserClosed);
   const now = Date.now();
   
-     // Only consider it a browser close if it was closed more than 5 seconds ago
-   // This prevents false positives from page refreshes or quick navigation
-   if ((now - closedTime) > 5000) {
-     return true;
-   }
+  // Only consider it a browser close if it was closed more than 3 seconds ago
+  // Reduced from 5 seconds for better production reliability
+  if ((now - closedTime) > 3000) {
+    return true;
+  }
   
   return false;
 }
