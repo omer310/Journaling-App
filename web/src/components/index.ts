@@ -8,4 +8,6 @@ export { FloatingEditComposer } from './FloatingEditComposer';
 export { MotivationBanner } from './MotivationBanner';
 export { StreakWidget } from './StreakWidget';
 export { LayoutSelector } from './LayoutSelector';
-export { Search } from './Search'; 
+export { Search } from './Search';
+export { default as SessionSecuritySettings } from './SessionSecuritySettings';
+export { default as SecurityNotification } from './SecurityNotification'; 

@@ -8,6 +8,9 @@ import { Calendar } from '@/components/Calendar';
 import { FilterPanel } from '@/components/FilterPanel';
 import { ListLayout, GridLayout, TimelineLayout } from '@/components/EntryLayouts';
 import { FloatingComposer, FloatingEditComposer, MotivationBanner, StreakWidget, LayoutSelector, Search } from '@/components';
+import SessionSecuritySettings from '@/components/SessionSecuritySettings';
+import SecurityNotification from '@/components/SecurityNotification';
+import { ImmersiveView } from '@/components/ImmersiveView';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { normalizeDateForDisplay } from '@/lib/dateUtils';
 import { supabase } from '@/lib/supabase';
@@ -16,6 +19,7 @@ import dayjs from 'dayjs';
 import {
   RiAddLine,
   RiDeleteBinLine,
+  RiShieldLine,
 } from 'react-icons/ri';
 
 // Helper function to get tags array
@@ -50,6 +54,9 @@ export default function Dashboard() {
     }
     return 'list';
   });
+  const [immersiveViewOpen, setImmersiveViewOpen] = useState(false);
+  const [immersiveViewEntry, setImmersiveViewEntry] = useState<any>(null);
+  const [showSecuritySettings, setShowSecuritySettings] = useState(false);
 
   const { 
     entries = [], 
@@ -203,6 +210,14 @@ export default function Dashboard() {
     // Optional: Add hover effects or tooltips here
   };
 
+  const handleViewEntry = (entryId: string) => {
+    const entry = entries.find(e => e.id === entryId);
+    if (entry) {
+      setImmersiveViewEntry(entry);
+      setImmersiveViewOpen(true);
+    }
+  };
+
   const filteredEntries = entries.filter((entry) => {
     const entryTags = getTagsArray(entry.tags);
     
@@ -268,6 +283,9 @@ export default function Dashboard() {
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Security Notification */}
+          <SecurityNotification className="mb-6" />
+
           {/* Top row with motivation banner and streak */}
           <div className="flex flex-col lg:flex-row gap-6 mb-8">
             {/* Motivation Banner */}
@@ -433,6 +451,15 @@ export default function Dashboard() {
                 <div className="flex items-center gap-4">
                   <LayoutSelector value={layoutMode} onChange={setLayoutMode} />
                   <button
+                    onClick={() => setShowSecuritySettings(true)}
+                    className="bg-surface text-text-primary px-3 py-2 rounded-lg border border-border hover:bg-surface/80 transition-all duration-200 flex items-center gap-2"
+                    aria-label="Security settings"
+                    title="Session Security Settings"
+                  >
+                    <RiShieldLine className="w-4 h-4" />
+                    <span className="text-sm font-medium">Security</span>
+                  </button>
+                  <button
                     onClick={openComposer}
                     className="bg-primary text-white px-4 py-2 rounded-lg shadow-lg hover:bg-primary/90 transition-all duration-200 flex items-center gap-2"
                     aria-label="Create new entry"
@@ -493,6 +520,7 @@ export default function Dashboard() {
                               onSelect={handleSelectEntry}
                               onEdit={(id) => openEditComposer(id)}
                               onDelete={handleDeleteEntry}
+                              onView={handleViewEntry}
                             />
               ) : layoutMode === 'timeline' ? (
                                             <TimelineLayout
@@ -502,6 +530,7 @@ export default function Dashboard() {
                               onSelect={handleSelectEntry}
                               onEdit={(id) => openEditComposer(id)}
                               onDelete={handleDeleteEntry}
+                              onView={handleViewEntry}
                             />
               ) : (
                                             <ListLayout
@@ -511,6 +540,7 @@ export default function Dashboard() {
                               onSelect={handleSelectEntry}
                               onEdit={(id) => openEditComposer(id)}
                               onDelete={handleDeleteEntry}
+                              onView={handleViewEntry}
                               onHover={handleEntryHover}
                             />
               )}
@@ -533,6 +563,38 @@ export default function Dashboard() {
               entryId={editEntryId || ''}
               onSave={handleSaveEditEntry}
             />
+
+            {/* Immersive View */}
+            <ImmersiveView
+              isOpen={immersiveViewOpen}
+              onClose={() => {
+                setImmersiveViewOpen(false);
+                setImmersiveViewEntry(null);
+              }}
+              entry={immersiveViewEntry}
+            />
+
+            {/* Security Settings Modal */}
+            {showSecuritySettings && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                <div className="bg-background rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-semibold text-text-primary">Session Security</h2>
+                      <button
+                        onClick={() => setShowSecuritySettings(false)}
+                        className="text-text-secondary hover:text-text-primary transition-colors"
+                      >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <SessionSecuritySettings />
+                  </div>
+                </div>
+              </div>
+            )}
         </div>
       </div>
     </ProtectedRoute>

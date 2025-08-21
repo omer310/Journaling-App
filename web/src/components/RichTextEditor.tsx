@@ -55,7 +55,7 @@ const AUTOSAVE_DELAY = 1000;
 // Helper function to detect Arabic text
 const containsArabic = (text: string) => /[\u0600-\u06FF]/.test(text);
 
-// Helper to set language attributes on elements
+// Helper to set language attributes on elements - improved to prevent cursor issues
 const setLanguageAttributes = (element: HTMLElement, text: string) => {
   const isArabic = containsArabic(text);
   if (isArabic) {
@@ -99,6 +99,15 @@ export function RichTextEditor({
     interimTranscript
   } = speechRecognitionResult;
 
+  // Get the current font from localStorage or use the passed fontFamily
+  const getCurrentFont = () => {
+    if (fontFamily) return fontFamily;
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('soul-pages-font') || 'Indie Flower';
+    }
+    return 'Indie Flower';
+  };
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -119,15 +128,23 @@ export function RichTextEditor({
     editorProps: {
       attributes: {
         class: 'editor-content prose dark:prose-invert max-w-none focus:outline-none',
-        dir: 'ltr',
-        style: `font-family: ${fontFamily || 'var(--app-font, Inter)'}, system-ui, sans-serif;`,
+        dir: 'ltr', // Default to LTR to prevent cursor issues
+        style: `font-family: ${getCurrentFont()}, system-ui, sans-serif;`,
       },
       handleDOMEvents: {
         input: (view, event) => {
+          // Only set language attributes on the specific element being edited
           const target = event.target as HTMLElement;
           if (target && target.textContent) {
-            setLanguageAttributes(target, target.textContent);
+            // Don't change the direction of the entire editor, just the specific element
+            if (target.tagName === 'P' || target.tagName === 'H1' || target.tagName === 'H2' || target.tagName === 'H3' || target.tagName === 'H4' || target.tagName === 'H5' || target.tagName === 'H6') {
+              setLanguageAttributes(target, target.textContent);
+            }
           }
+          return false;
+        },
+        keydown: (view, event) => {
+          // Prevent automatic direction changes that could cause cursor issues
           return false;
         },
       },
@@ -136,10 +153,7 @@ export function RichTextEditor({
       const html = editor.getHTML();
       const editorElement = document.querySelector('.editor-content');
       if (editorElement instanceof HTMLElement) {
-        // Set language attributes on the editor container
-        setLanguageAttributes(editorElement, editor.getText());
-        
-        // Set language attributes on individual paragraphs
+        // Only set language attributes on individual paragraphs, not the entire editor
         editorElement.querySelectorAll('p, h1, h2, h3, h4, h5, h6').forEach((element) => {
           if (element instanceof HTMLElement && element.textContent) {
             setLanguageAttributes(element, element.textContent);
@@ -150,6 +164,17 @@ export function RichTextEditor({
     },
     immediatelyRender: false,
   });
+
+  // Update font when it changes
+  useEffect(() => {
+    if (editor) {
+      const currentFont = getCurrentFont();
+      const editorElement = document.querySelector('.editor-content');
+      if (editorElement instanceof HTMLElement) {
+        editorElement.style.fontFamily = `${currentFont}, system-ui, sans-serif`;
+      }
+    }
+  }, [editor, fontFamily]);
 
   // Insert transcript into editor when it changes
   useEffect(() => {

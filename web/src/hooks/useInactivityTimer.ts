@@ -5,7 +5,9 @@ import {
   getLastActivityTime, 
   updateLastActivityTime, 
   getInactivityTimeout, 
-  checkInactivity 
+  checkInactivity,
+  checkBrowserWasClosed,
+  clearBrowserCloseFlag
 } from '@/lib/dateUtils';
 
 interface UseInactivityTimerOptions {
@@ -25,6 +27,7 @@ export function useInactivityTimer({
   const warningRef = useRef<NodeJS.Timeout | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
   const isTimerActiveRef = useRef<boolean>(false);
+  const browserCloseCheckRef = useRef<NodeJS.Timeout | null>(null);
 
   const clearAllTimers = useCallback(() => {
     if (timeoutRef.current) {
@@ -35,11 +38,13 @@ export function useInactivityTimer({
       clearTimeout(warningRef.current);
       warningRef.current = null;
     }
+    if (browserCloseCheckRef.current) {
+      clearTimeout(browserCloseCheckRef.current);
+      browserCloseCheckRef.current = null;
+    }
   }, []);
 
   const performLogout = useCallback(async () => {
-    console.log('Performing automatic logout due to inactivity');
-    
     try {
       // Call custom timeout handler if provided
       if (onTimeout) {
@@ -72,14 +77,18 @@ export function useInactivityTimer({
     const timeout = getInactivityTimeout();
     const warningTimeMs = Math.min(warningTime, timeout - 30000); // Ensure warning is at least 30s before timeout
 
-    console.log('Resetting inactivity timer. Timeout:', timeout, 'Warning time:', warningTimeMs);
+    // Set up browser close detection check
+    browserCloseCheckRef.current = setInterval(() => {
+      if (checkBrowserWasClosed()) {
+        clearBrowserCloseFlag();
+        performLogout();
+      }
+    }, 5000); // Check every 5 seconds
 
     // Set warning timer
     if (warningTimeMs > 0 && timeout > warningTimeMs) {
       warningRef.current = setTimeout(() => {
         if (!isTimerActiveRef.current) return; // Timer was disabled
-        
-        console.log('Inactivity warning triggered');
         
         // Call warning callback if provided
         if (onWarning) {
@@ -108,7 +117,6 @@ export function useInactivityTimer({
     timeoutRef.current = setTimeout(() => {
       if (!isTimerActiveRef.current) return; // Timer was disabled
       
-      console.log('Inactivity timeout reached - signing out user');
       performLogout();
     }, timeout);
   }, [enabled, warningTime, onWarning, clearAllTimers, performLogout]);
@@ -121,7 +129,6 @@ export function useInactivityTimer({
     
     // Only reset if enough time has passed to avoid excessive resets
     if (timeSinceLastActivity > 3000) { // 3 seconds threshold
-      console.log('User activity detected, resetting timer');
       lastActivityRef.current = now;
       updateLastActivityTime();
       resetTimer();

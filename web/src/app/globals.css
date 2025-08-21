@@ -117,6 +117,61 @@ html:not(.dark) {
   --app-font: 'Indie Flower', cursive, system-ui, sans-serif;
 }
 
+/* Immersive view styles */
+.immersive-view-content {
+  font-family: var(--app-font);
+  line-height: 1.8;
+  letter-spacing: 0.02em;
+}
+
+.immersive-view-content h1,
+.immersive-view-content h2,
+.immersive-view-content h3,
+.immersive-view-content h4,
+.immersive-view-content h5,
+.immersive-view-content h6 {
+  font-family: var(--app-font);
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.immersive-view-content p {
+  margin-bottom: 1em;
+}
+
+.immersive-view-content ul,
+.immersive-view-content ol {
+  margin-bottom: 1em;
+  padding-left: 1.5em;
+}
+
+.immersive-view-content blockquote {
+  border-left: 3px solid var(--color-primary);
+  padding-left: 1em;
+  margin: 1em 0;
+  font-style: italic;
+}
+
+.immersive-view-content code {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 0.2em 0.4em;
+  border-radius: 0.25em;
+  font-family: 'Courier New', monospace;
+}
+
+.immersive-view-content pre {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 1em;
+  border-radius: 0.5em;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.immersive-view-content pre code {
+  background: none;
+  padding: 0;
+}
+
 /* Theme transition - apply to most elements but not body to avoid conflicts */
 *:not(html):not(body) {
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;

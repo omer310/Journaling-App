@@ -6,7 +6,13 @@ import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store/useStore';
 import { setupRealtimeSubscription, cleanupRealtimeSubscription } from '@/store/useStore';
 import { useInactivityTimer } from '@/hooks/useInactivityTimer';
-import { clearInactivityData } from '@/lib/dateUtils';
+import { 
+  clearInactivityData, 
+  setupBrowserCloseDetection, 
+  cleanupBrowserCloseDetection,
+  checkBrowserWasClosed,
+  clearBrowserCloseFlag
+} from '@/lib/dateUtils';
 
 interface AuthContextType {
   user: User | null;
@@ -24,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const initializedRef = React.useRef(false);
   const authChangeInProgressRef = React.useRef(false);
   const retryCountRef = React.useRef(0);
+  const browserCloseCheckedRef = React.useRef(false);
 
   // Initialize inactivity timer for authenticated users
   useInactivityTimer({
@@ -38,6 +45,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
+    // Set up browser close detection
+    setupBrowserCloseDetection();
+
+    // Check if browser was closed and force logout if so (only once)
+    // Don't run this check if we're already on the login page
+    if (!browserCloseCheckedRef.current && 
+        checkBrowserWasClosed() && 
+        window.location.pathname !== '/login') {
+      console.log('Browser was closed - forcing logout for security');
+      browserCloseCheckedRef.current = true;
+      
+      // Clear all session data immediately
+      clearInactivityData();
+      clearBrowserCloseFlag();
+      
+      // Force logout and redirect immediately
+      const forceLogout = async () => {
+        try {
+          await supabase.auth.signOut();
+        } catch (error) {
+          console.error('Error during forced logout:', error);
+        } finally {
+          // Always redirect, even if logout fails
+          window.location.href = '/login?reason=Browser was closed - session terminated for security';
+        }
+      };
+      
+      forceLogout();
+      return; // Don't continue with normal session initialization
+    }
+
+    // Mark that we've checked for browser close
+    browserCloseCheckedRef.current = true;
+
     // Debounce session checks to prevent excessive API calls
     let sessionCheckTimeout: NodeJS.Timeout;
     
@@ -54,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           // Clear any old inactivity data when user logs in
           clearInactivityData();
+          clearBrowserCloseFlag();
           setUser(session.user);
           setLoading(false);
           initializedRef.current = true;
@@ -118,6 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (session?.user) {
               // Clear any old inactivity data when user logs in
               clearInactivityData();
+              clearBrowserCloseFlag();
               setUser(session.user);
               setLoading(false);
               
@@ -160,6 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       subscription.unsubscribe();
       cleanupRealtimeSubscription();
+      cleanupBrowserCloseDetection();
     };
   }, []);
 
@@ -176,6 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (session?.user) {
           clearInactivityData();
+          clearBrowserCloseFlag();
           setUser(session.user);
           setLoading(false);
           initializedRef.current = true;
