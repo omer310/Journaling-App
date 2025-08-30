@@ -17,7 +17,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 function RootLayoutContent({ children }: { children: React.ReactNode }) {
   const { isOffline, setOfflineStatus } = useStore();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const fontSelectorRef = useRef<HTMLDivElement>(null);
   const [showFontSelector, setShowFontSelector] = useState(false);
   const [selectedFont, setSelectedFont] = useState(() => {
@@ -28,6 +28,12 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
     }
     return "Indie Flower";
   });
+
+  // Check if we're on a login/register page to hide authenticated features
+  const isOnAuthPage = typeof window !== "undefined" && (
+    window.location.pathname === "/login" || 
+    window.location.pathname === "/register"
+  );
 
   useEffect(() => {
     // Handle click outside to close dropdown
@@ -125,7 +131,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
 
-                {user && (
+                {user && !loading && !isOnAuthPage && (
                   <>
                     {/* Font Selector */}
                     <div
@@ -213,7 +219,7 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
             {children}
           </ErrorBoundary>
         </main>
-        {user && <InactivityWarning />}
+        {user && !loading && !isOnAuthPage && <InactivityWarning />}
       </div>
     </>
   );
