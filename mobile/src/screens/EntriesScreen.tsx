@@ -33,7 +33,7 @@ export function EntriesScreen({ onEditEntry, onNewEntry, onOpenSettings }: Props
   const loadEntries = useCallback(async () => {
     try {
       const allEntries = await storage.getAllEntries();
-      ('Loaded entries:', allEntries);
+      console.log('Loaded entries:', allEntries);
       setEntries(allEntries);
     } catch (error) {
       console.error('Error loading entries:', error);
@@ -212,7 +212,7 @@ export function EntriesScreen({ onEditEntry, onNewEntry, onOpenSettings }: Props
                   {item.title}
                 </Text>
                 <Text style={[styles.entryDate, isDarkMode && styles.darkSecondaryText]}>
-                  {new Date(item.createdAt).toLocaleDateString()}
+                  {new Date(item.date || item.createdAt).toLocaleDateString()} {new Date(item.date || item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                 </Text>
                 <Text style={[styles.entryPreview, isDarkMode && styles.darkText]} numberOfLines={2}>
                   {item.content}

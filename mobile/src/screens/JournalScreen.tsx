@@ -11,6 +11,7 @@ import {
   Animated,
   Platform,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { storage, JournalEntry, Tag } from "../services/storage";
@@ -50,6 +51,7 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [buttonScale] = useState(new Animated.Value(1));
   const [pulseAnimation] = useState(new Animated.Value(1));
+  const [currentTime, setCurrentTime] = useState(new Date());
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
 
@@ -93,7 +95,6 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
     } else {
       // New entry - start in edit mode
       setIsEditing(true);
-      scrollToEnd();
     }
   }, [entry]);
 
@@ -123,13 +124,6 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
   const changeHeading = (level: number) => setHeadingLevel(level);
 
   const toggleToolbar = () => setShowToolbar(!showToolbar);
-
-  // Function to scroll to the end of the content
-  const scrollToEnd = () => {
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 300); // Delay to ensure keyboard animation and layout are complete
-  };
 
   // Get reading time estimate (average 200 words per minute)
   const getReadingTime = () => {
@@ -407,6 +401,17 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
     loadTags();
   }, []);
 
+  // Update time every second for new entries only
+  useEffect(() => {
+    if (!entry) { // Only for new entries
+      const timer = setInterval(() => {
+        setCurrentTime(new Date());
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [entry]);
+
   useEffect(() => {
     const keyboardWillShowListener = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
@@ -489,7 +494,13 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
         id: entry?.id || generateUUID(),
         title: title.trim(),
         content: content.trim(),
-        date: entry?.date || new Date().toISOString().split("T")[0],
+        date: entry?.date || (() => {
+          const now = new Date();
+          const date = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
+          const pad = (n: number) => n.toString().padStart(2, '0');
+          const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+          return `${date} ${time}`;
+        })(),
         tags: selectedTags,
         mood: entry?.mood,
         createdAt: entry?.createdAt || new Date().toISOString(),
@@ -559,7 +570,7 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
                   month: "short",
                   year: "numeric",
                 })
-              : new Date().toLocaleDateString("en-US", {
+              : currentTime.toLocaleDateString("en-US", {
                   weekday: "long",
                   day: "2-digit",
                   month: "short",
@@ -575,9 +586,10 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
                   minute: "2-digit",
                   hour12: false,
                 })
-              : new Date().toLocaleTimeString("en-US", {
+              : currentTime.toLocaleTimeString("en-US", {
                   hour: "2-digit",
                   minute: "2-digit",
+                  second: "2-digit",
                   hour12: false,
                 })}
           </Text>
@@ -585,13 +597,12 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
 
         <View style={styles.headerRight}>
           {entry && !isEditing ? (
-            <TouchableOpacity
-              onPress={() => {
-                setIsEditing(true);
-                scrollToEnd();
-              }}
-              style={styles.editButton}
-            >
+                    <TouchableOpacity
+          onPress={() => {
+            setIsEditing(true);
+          }}
+          style={styles.editButton}
+        >
               <Ionicons
                 name="create-outline"
                 size={24}
@@ -605,7 +616,7 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
               style={[styles.headerIconButton, styles.saveButton]}
             >
               {isSaving ? (
-                <Text style={styles.saveButtonText}>Saving...</Text>
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <Ionicons name="checkmark" size={20} color="#fff" />
               )}
@@ -782,7 +793,6 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
                 }),
               ]).start();
               setIsEditing(true);
-              scrollToEnd();
             }}
             activeOpacity={0.8}
           >
@@ -848,11 +858,6 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: "center",
     alignItems: "center",
-  },
-  saveButtonText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 14,
   },
   mainContent: {
     flex: 1,
