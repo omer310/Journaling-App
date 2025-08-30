@@ -8,8 +8,7 @@ import { Calendar } from '@/components/Calendar';
 import { FilterPanel } from '@/components/FilterPanel';
 import { ListLayout, GridLayout, TimelineLayout } from '@/components/EntryLayouts';
 import { FloatingComposer, FloatingEditComposer, MotivationBanner, StreakWidget, LayoutSelector, Search } from '@/components';
-import SessionSecuritySettings from '@/components/SessionSecuritySettings';
-import SecurityNotification from '@/components/SecurityNotification';
+
 import { ImmersiveView } from '@/components/ImmersiveView';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { normalizeDateForDisplay } from '@/lib/dateUtils';
@@ -19,7 +18,6 @@ import dayjs from 'dayjs';
 import {
   RiAddLine,
   RiDeleteBinLine,
-  RiShieldLine,
 } from 'react-icons/ri';
 
 // Helper function to get tags array
@@ -56,7 +54,11 @@ export default function Dashboard() {
   });
   const [immersiveViewOpen, setImmersiveViewOpen] = useState(false);
   const [immersiveViewEntry, setImmersiveViewEntry] = useState<any>(null);
-  const [showSecuritySettings, setShowSecuritySettings] = useState(false);
+
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const entriesPerPage = 6;
 
   const { 
     entries = [], 
@@ -80,6 +82,11 @@ export default function Dashboard() {
   useEffect(() => {
     localStorage.setItem('journal-layout-mode', layoutMode);
   }, [layoutMode]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedTags, selectedMoods, dateRange, searchQuery]);
 
   // Calculate writing streak
   useEffect(() => {
@@ -267,6 +274,42 @@ export default function Dashboard() {
     return true;
   });
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredEntries.length / entriesPerPage);
+  const startIndex = (currentPage - 1) * entriesPerPage;
+  const endIndex = startIndex + entriesPerPage;
+  const paginatedEntries = filteredEntries.slice(startIndex, endIndex);
+
+
+
+  // Ensure currentPage is within valid range
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+    // If current page has no entries but there are entries, go to the last page
+    if (paginatedEntries.length === 0 && filteredEntries.length > 0 && currentPage > 1) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage, paginatedEntries.length, filteredEntries.length]);
+
+  // Pagination handlers
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -283,8 +326,7 @@ export default function Dashboard() {
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Security Notification */}
-          <SecurityNotification className="mb-6" />
+
 
           {/* Top row with motivation banner and streak */}
           <div className="flex flex-col lg:flex-row gap-6 mb-8">
@@ -451,15 +493,6 @@ export default function Dashboard() {
                 <div className="flex items-center gap-4">
                   <LayoutSelector value={layoutMode} onChange={setLayoutMode} />
                   <button
-                    onClick={() => setShowSecuritySettings(true)}
-                    className="bg-surface text-text-primary px-3 py-2 rounded-lg border border-border hover:bg-surface/80 transition-all duration-200 flex items-center gap-2"
-                    aria-label="Security settings"
-                    title="Session Security Settings"
-                  >
-                    <RiShieldLine className="w-4 h-4" />
-                    <span className="text-sm font-medium">Security</span>
-                  </button>
-                  <button
                     onClick={openComposer}
                     className="bg-primary text-white px-4 py-2 rounded-lg shadow-lg hover:bg-primary/90 transition-all duration-200 flex items-center gap-2"
                     aria-label="Create new entry"
@@ -510,11 +543,13 @@ export default function Dashboard() {
                   <LoadingSpinner 
                     size="large" 
                     text="Loading your journal entries..." 
+                    showProgress={true}
+                    progress={entries.length > 0 ? Math.min((entries.length / Math.max(entries.length, 1)) * 100, 95) : 0}
                   />
                 </div>
               ) : layoutMode === 'grid' ? (
                                             <GridLayout
-                              entries={filteredEntries}
+                              entries={paginatedEntries}
                               tags={tags}
                               selectedEntries={selectedEntries}
                               onSelect={handleSelectEntry}
@@ -524,7 +559,7 @@ export default function Dashboard() {
                             />
               ) : layoutMode === 'timeline' ? (
                                             <TimelineLayout
-                              entries={filteredEntries}
+                              entries={paginatedEntries}
                               tags={tags}
                               selectedEntries={selectedEntries}
                               onSelect={handleSelectEntry}
@@ -534,7 +569,7 @@ export default function Dashboard() {
                             />
               ) : (
                                             <ListLayout
-                              entries={filteredEntries}
+                              entries={paginatedEntries}
                               tags={tags}
                               selectedEntries={selectedEntries}
                               onSelect={handleSelectEntry}
@@ -543,6 +578,80 @@ export default function Dashboard() {
                               onView={handleViewEntry}
                               onHover={handleEntryHover}
                             />
+              )}
+
+                             {/* Pagination Controls */}
+               {totalPages > 1 && filteredEntries.length > 0 && (
+                 <div className="flex items-center justify-between mt-8 px-4 py-3 bg-surface border border-border rounded-lg">
+                                       <div className="flex items-center gap-2 text-sm text-text-secondary">
+                      <span>
+                        Showing {startIndex + 1}-{Math.min(endIndex, filteredEntries.length)} of {filteredEntries.length} entries
+                      </span>
+                    </div>
+                  
+                  <div className="flex items-center gap-2">
+                    {/* Previous Page Button */}
+                    <button
+                      onClick={goToPreviousPage}
+                      disabled={currentPage === 1}
+                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-text-primary bg-surface border border-border rounded-lg hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Previous
+                    </button>
+
+                    {/* Page Numbers */}
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                        // Show first page, last page, current page, and pages around current page
+                        const shouldShow = 
+                          page === 1 || 
+                          page === totalPages || 
+                          (page >= currentPage - 1 && page <= currentPage + 1);
+                        
+                        if (!shouldShow) {
+                          // Show ellipsis if there's a gap
+                          if (page === currentPage - 2 || page === currentPage + 2) {
+                            return (
+                              <span key={`ellipsis-${page}`} className="px-2 py-2 text-text-secondary">
+                                ...
+                              </span>
+                            );
+                          }
+                          return null;
+                        }
+
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => goToPage(page)}
+                            className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                              currentPage === page
+                                ? 'bg-primary text-white'
+                                : 'text-text-primary bg-surface border border-border hover:bg-surface-hover'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Next Page Button */}
+                    <button
+                      onClick={goToNextPage}
+                      disabled={currentPage === totalPages}
+                      className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-text-primary bg-surface border border-border rounded-lg hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -574,27 +683,7 @@ export default function Dashboard() {
               entry={immersiveViewEntry}
             />
 
-            {/* Security Settings Modal */}
-            {showSecuritySettings && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                <div className="bg-background rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-xl font-semibold text-text-primary">Session Security</h2>
-                      <button
-                        onClick={() => setShowSecuritySettings(false)}
-                        className="text-text-secondary hover:text-text-primary transition-colors"
-                      >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                    <SessionSecuritySettings />
-                  </div>
-                </div>
-              </div>
-            )}
+
         </div>
       </div>
     </ProtectedRoute>

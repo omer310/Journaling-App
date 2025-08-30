@@ -218,21 +218,13 @@ export const useStore = create<AppState>()(
               return;
             }
 
-            // Fetch entries with timeout
-            const fetchPromise = supabase
+            // Fetch entries with limit for better performance
+            const { data: entries, error } = await supabase
               .from('journal_entries')
               .select('*')
               .eq('user_id', user.id)
-              .order('last_modified', { ascending: false });
-              
-            const fetchTimeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Data fetch timeout')), 15000)
-            );
-
-            const { data: entries, error } = await Promise.race([
-              fetchPromise,
-              fetchTimeoutPromise
-            ]) as { data: any, error: any };
+              .order('last_modified', { ascending: false })
+              .limit(1000); // Add reasonable limit
 
             if (error) {
               console.error('Error fetching entries:', error);
@@ -243,103 +235,104 @@ export const useStore = create<AppState>()(
               throw new Error('No entries returned from database');
             }
 
-            const decryptedEntries: JournalEntry[] = [];
-            const { tags: existingTags } = get();
-            
-            for (const entry of entries) {
-            try {
-              // Decrypt the title and content if they're encrypted
-              const title = isEncrypted(entry.title) ? await decryptData(entry.title) : entry.title;
-              const content = isEncrypted(entry.content) ? await decryptData(entry.content) : entry.content;
+            // OPTIMIZATION: Parallel decryption instead of sequential
+            const decryptionPromises = entries.map(async (entry: any) => {
+              try {
+                // Decrypt title and content in parallel
+                const [title, content] = await Promise.all([
+                  isEncrypted(entry.title) ? decryptData(entry.title) : Promise.resolve(entry.title),
+                  isEncrypted(entry.content) ? decryptData(entry.content) : Promise.resolve(entry.content)
+                ]);
 
-              // Handle missing tag definitions for mobile entries
-              const entryTags = Array.isArray(entry.tags) ? entry.tags : [];
-              const missingTagIds = entryTags.filter((tagId: string) => 
-                !existingTags.find(tag => tag.id === tagId)
-              );
+                // Handle missing tag definitions for mobile entries
+                const entryTags = Array.isArray(entry.tags) ? entry.tags : [];
+                const { tags: existingTags } = get();
+                const missingTagIds = entryTags.filter((tagId: string) => 
+                  !existingTags.find(tag => tag.id === tagId)
+                );
 
-              // Create missing tag definitions for mobile entries
-              if (missingTagIds.length > 0 && entry.source === 'mobile') {
-                const newTags = missingTagIds.map((tagId: string) => ({
-                  id: tagId,
-                  name: `Mobile Tag ${missingTagIds.indexOf(tagId) + 1}`,
-                  color: `hsl(${Math.random() * 360}, 70%, 50%)`,
-                }));
+                // Create missing tag definitions for mobile entries
+                if (missingTagIds.length > 0 && entry.source === 'mobile') {
+                  const newTags = missingTagIds.map((tagId: string) => ({
+                    id: tagId,
+                    name: `Mobile Tag ${missingTagIds.indexOf(tagId) + 1}`,
+                    color: `hsl(${Math.random() * 360}, 70%, 50%)`,
+                  }));
+                  
+                  set((state) => ({
+                    tags: [...state.tags, ...newTags]
+                  }));
+                }
+
+                // Normalize the date to ensure consistent timezone handling
+                const normalizedDate = entry.source === 'mobile' 
+                  ? normalizeDateForMobileEntry(entry.date)
+                  : normalizeDateForStorage(entry.date);
                 
-                set((state) => ({
-                  tags: [...state.tags, ...newTags]
-                }));
+                return {
+                  id: entry.id,
+                  title: title || '',
+                  content: content || '',
+                  date: normalizedDate,
+                  tags: entryTags,
+                  lastModified: entry.last_modified,
+                  userId: entry.user_id,
+                  source: entry.source,
+                  mood: entry.mood,
+                };
+              } catch (error) {
+                console.error('Error decrypting entry:', error);
+                return {
+                  id: entry.id,
+                  title: '[Encrypted Entry]',
+                  content: 'This entry could not be decrypted. It may have been created with a different encryption method.',
+                  date: entry.date,
+                  tags: Array.isArray(entry.tags) ? entry.tags : [],
+                  lastModified: entry.last_modified,
+                  userId: entry.user_id,
+                  source: entry.source,
+                  mood: entry.mood,
+                };
               }
+            });
 
-              // Normalize the date to ensure consistent timezone handling
-              // Use special handling for mobile entries
-              const normalizedDate = entry.source === 'mobile' 
-                ? normalizeDateForMobileEntry(entry.date)
-                : normalizeDateForStorage(entry.date);
-              
-              
-              
-              decryptedEntries.push({
-                id: entry.id,
-                title: title || '',
-                content: content || '',
-                date: normalizedDate,
-                tags: entryTags,
-                lastModified: entry.last_modified,
-                userId: entry.user_id,
-                source: entry.source,
-                mood: entry.mood,
-              });
-            } catch (error) {
-              console.error('Error decrypting entry:', error);
-              decryptedEntries.push({
-                id: entry.id,
-                title: '[Encrypted Entry]',
-                content: 'This entry could not be decrypted. It may have been created with a different encryption method.',
-                date: entry.date,
-                tags: Array.isArray(entry.tags) ? entry.tags : [],
-                lastModified: entry.last_modified,
-                userId: entry.user_id,
-                source: entry.source,
-                mood: entry.mood,
-              });
+            // Wait for all decryptions to complete
+            const decryptedEntries = await Promise.all(decryptionPromises);
+
+            // Update both cache and current entries
+            set({ 
+              entries: decryptedEntries, 
+              cachedEntries: decryptedEntries,
+              lastFetchTime: Date.now(),
+              entriesLoading: false,
+              lastSyncTime: new Date().toISOString()
+            });
+          } catch (error: any) {
+            console.error(`Error in fetchEntries (attempt ${retryCount + 1}/${maxRetries}):`, error);
+            
+            if (retryCount < maxRetries - 1) {
+              retryCount++;
+              const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+              console.log(`Retrying fetch entries in ${delay}ms...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              return attemptFetch();
             }
+            
+            set({ entriesLoading: false });
+            
+            // If we have cached entries, use them as fallback
+            const { cachedEntries } = get();
+            if (cachedEntries.length > 0) {
+              console.log('Using cached entries as fallback');
+              set({ entries: cachedEntries });
+              return;
+            }
+            
+            throw error; // Re-throw the error to be handled by the UI
           }
+        };
 
-          // Update both cache and current entries
-          set({ 
-            entries: decryptedEntries, 
-            cachedEntries: decryptedEntries,
-            lastFetchTime: Date.now(),
-            entriesLoading: false,
-            lastSyncTime: new Date().toISOString()
-          });
-        } catch (error: any) {
-          console.error(`Error in fetchEntries (attempt ${retryCount + 1}/${maxRetries}):`, error);
-          
-          if (retryCount < maxRetries - 1) {
-            retryCount++;
-            const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
-            console.log(`Retrying fetch entries in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return attemptFetch();
-          }
-          
-          set({ entriesLoading: false });
-          
-          // If we have cached entries, use them as fallback
-          const { cachedEntries } = get();
-          if (cachedEntries.length > 0) {
-            console.log('Using cached entries as fallback');
-            set({ entries: cachedEntries });
-            return;
-          }
-          
-          throw error; // Re-throw the error to be handled by the UI
-        }
-      };
-
-      return attemptFetch();
+        return attemptFetch();
       },
       addEntry: async (entry) => {
         try {

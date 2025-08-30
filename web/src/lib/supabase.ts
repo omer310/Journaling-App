@@ -19,6 +19,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       'apikey': supabaseAnonKey,
     },
   },
+  // Performance optimizations
+  db: {
+    schema: 'public',
+  },
+  // Connection pooling and timeout optimizations
+  realtime: {
+    params: {
+      eventsPerSecond: 10, // Limit real-time events for better performance
+    },
+  },
 });
 
 export type Database = {
