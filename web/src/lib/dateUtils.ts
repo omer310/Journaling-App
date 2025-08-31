@@ -188,13 +188,15 @@ export function updateLastActivityTime(): void {
 export function getInactivityTimeout(): number {
   // Default to 15 minutes (900000 ms) for good balance of security and usability
   const timeout = parseInt(localStorage.getItem('inactivityTimeout') || '900000');
-  // Enforce maximum of 15 minutes (900000 ms) for security
-  return Math.min(timeout, 900000);
+  // Return the user's preferred timeout without artificial caps
+  // (Individual components can enforce their own limits if needed)
+  return timeout;
 }
 
 export function setInactivityTimeout(timeoutMs: number): void {
-  // Enforce maximum of 15 minutes (900000 ms) for security
-  const secureTimeout = Math.min(timeoutMs, 900000);
+  // Allow flexible timeout settings as per user preference
+  // Enforce reasonable minimum of 1 minute for security
+  const secureTimeout = Math.max(timeoutMs, 60000);
   localStorage.setItem('inactivityTimeout', secureTimeout.toString());
 }
 
