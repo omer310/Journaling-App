@@ -15,7 +15,15 @@ class PerformanceMonitor {
   private activeOperations: Map<string, PerformanceMetric> = new Map();
 
   startOperation(operation: string, metadata?: Record<string, any>): string {
-    const id = `${operation}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Use cryptographically secure random generation for operation IDs
+    const array = new Uint8Array(9);
+    crypto.getRandomValues(array);
+    // Convert to base36 string (0-9, a-z)
+    const randomString = Array.from(array)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 9);
+    const id = `${operation}_${Date.now()}_${randomString}`;
     const metric: PerformanceMetric = {
       operation,
       startTime: performance.now(),

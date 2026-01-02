@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 
 const ENTRIES_KEY = 'journal_entries';
 const THEME_KEY = 'app_theme';
@@ -132,7 +133,7 @@ export const storage = {
       const tags = await this.getAllTags();
       const newTag: Tag = {
         ...tag,
-        id: this.generateUUID(),
+        id: await this.generateUUID(),
       };
       tags.push(newTag);
       await AsyncStorage.setItem(TAGS_KEY, JSON.stringify(tags));
@@ -179,11 +180,26 @@ export const storage = {
     }
   },
 
-  generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random() * 16 | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
+  async generateUUID(): Promise<string> {
+    // Use cryptographically secure random generation for UUID
+    // Generate 16 random bytes (128 bits) for UUID v4
+    const randomBytes = await Crypto.getRandomBytesAsync(16);
+    
+    // Set version (4) and variant bits according to UUID v4 spec
+    randomBytes[6] = (randomBytes[6] & 0x0f) | 0x40; // Version 4
+    randomBytes[8] = (randomBytes[8] & 0x3f) | 0x80; // Variant 10
+    
+    // Convert to UUID string format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    const hex = Array.from(randomBytes)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    
+    return [
+      hex.slice(0, 8),
+      hex.slice(8, 12),
+      hex.slice(12, 16),
+      hex.slice(16, 20),
+      hex.slice(20, 32)
+    ].join('-');
   },
 }; 

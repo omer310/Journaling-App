@@ -360,10 +360,18 @@ class SecurityMonitoring {
   }
   
   /**
-   * Generate event ID
+   * Generate cryptographically secure event ID
    */
   private generateEventId(): string {
-    return `sec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Use cryptographically secure random generation
+    const array = new Uint8Array(9);
+    crypto.getRandomValues(array);
+    // Convert to base36 string (0-9, a-z)
+    const randomString = Array.from(array)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 9);
+    return `sec_${Date.now()}_${randomString}`;
   }
   
   /**

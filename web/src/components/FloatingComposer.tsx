@@ -28,7 +28,15 @@ export function FloatingComposer({ isOpen, onClose, onSave }: FloatingComposerPr
 
   // Calculate word count
   useEffect(() => {
-    const text = content.replace(/<[^>]*>/g, '');
+    // Remove HTML tags iteratively to handle nested tags properly
+    // Example: "<sc<script>ript>alert(1)</script></script>" should be fully removed
+    let text = content;
+    let previous: string;
+    do {
+      previous = text;
+      text = text.replace(/<[^>]*>/g, '');
+    } while (text !== previous);
+    
     const words = text.split(/\s+/).filter(word => word.length > 0);
     setWordCount(words.length);
   }, [content]);

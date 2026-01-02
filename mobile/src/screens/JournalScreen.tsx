@@ -18,6 +18,7 @@ import { storage, JournalEntry, Tag } from "../services/storage";
 import { sync } from "../services/sync";
 import { Tags } from "../../components/Tags";
 import { Ionicons } from "@expo/vector-icons";
+import * as Crypto from 'expo-crypto';
 
 interface Props {
   entry?: JournalEntry;
@@ -55,15 +56,27 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
 
-  const generateUUID = () => {
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
-      /[xy]/g,
-      function (c) {
-        const r = (Math.random() * 16) | 0;
-        const v = c === "x" ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-      }
-    );
+  const generateUUID = async (): Promise<string> => {
+    // Use cryptographically secure random generation for UUID
+    // Generate 16 random bytes (128 bits) for UUID v4
+    const randomBytes = await Crypto.getRandomBytesAsync(16);
+    
+    // Set version (4) and variant bits according to UUID v4 spec
+    randomBytes[6] = (randomBytes[6] & 0x0f) | 0x40; // Version 4
+    randomBytes[8] = (randomBytes[8] & 0x3f) | 0x80; // Variant 10
+    
+    // Convert to UUID string format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    const hex = Array.from(randomBytes)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    
+    return [
+      hex.slice(0, 8),
+      hex.slice(8, 12),
+      hex.slice(12, 16),
+      hex.slice(16, 20),
+      hex.slice(20, 32)
+    ].join('-');
   };
 
   useEffect(() => {
@@ -491,7 +504,7 @@ export function JournalScreen({ entry, onSave, onCancel }: Props) {
     setIsSaving(true);
     try {
       const newEntry = {
-        id: entry?.id || generateUUID(),
+        id: entry?.id || await generateUUID(),
         title: title.trim(),
         content: content.trim(),
         date: entry?.date || (() => {

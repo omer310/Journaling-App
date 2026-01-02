@@ -33,11 +33,10 @@ async function encryptAESGCM(data: string, key: Uint8Array): Promise<string> {
       return 'EMPTY_STRING_ENCRYPTED';
     }
     
-    // Generate random IV
-    const ivBytes = new Uint8Array(12);
-    for (let i = 0; i < 12; i++) {
-      ivBytes[i] = Math.floor(Math.random() * 256);
-    }
+    // Generate cryptographically secure random IV
+    // Use expo-crypto's getRandomBytesAsync for secure random generation
+    const randomBytes = await Crypto.getRandomBytesAsync(12);
+    const ivBytes = new Uint8Array(randomBytes);
     
     const encoder = new TextEncoder();
     const dataBuffer = encoder.encode(data);

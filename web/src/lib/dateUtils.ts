@@ -346,8 +346,15 @@ export function setupSmartSessionSecurity(): void {
 }
 
 function generateSessionFingerprint(): string {
-  // Create a unique fingerprint based on timestamp and random number
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  // Create a unique fingerprint based on timestamp and cryptographically secure random number
+  const array = new Uint8Array(9);
+  crypto.getRandomValues(array);
+  // Convert to base36 string (0-9, a-z)
+  const randomString = Array.from(array)
+    .map(b => b.toString(36))
+    .join('')
+    .substring(0, 9);
+  return `${Date.now()}-${randomString}`;
 }
 
 export function cleanupSmartSessionSecurity(): void {
