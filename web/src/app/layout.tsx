@@ -111,17 +111,18 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
         />
       </Head>
       <div className={inter.className}>
-        <nav className="bg-surface border-b border-border">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16">
-              <div className="flex">
-                <Link
-                  href="/"
-                  className="flex items-center text-2xl font-bold text-primary"
-                >
-                  Soul Pages
-                </Link>
-              </div>
+        {!isOnAuthPage && (
+          <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-white/10 dark:bg-black/20 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-2xl shadow-2xl shadow-black/20 dark:shadow-black/40 ring-1 ring-white/5 w-full max-w-7xl">
+            <div className="px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center h-16 gap-8">
+                <div className="flex">
+                  <Link
+                    href="/"
+                    className="flex items-center text-2xl font-bold text-primary"
+                  >
+                    Soul Pages
+                  </Link>
+                </div>
 
               <div className="flex items-center gap-4">
                 {isOffline && (
@@ -212,9 +213,10 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </div>
-        </nav>
+          </nav>
+        )}
 
-        <main>
+        <main className={!isOnAuthPage ? "pt-24" : ""}>
           <ErrorBoundary>
             {children}
           </ErrorBoundary>
