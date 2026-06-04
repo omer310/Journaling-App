@@ -4,14 +4,14 @@ A modern, secure journaling application with both web and mobile interfaces.
 
 ## Features
 
-- 🔒 Secure authentication and data encryption
-- 📱 Cross-platform support (Web & Mobile)
-- 📝 Rich text editing with modern formatting tools
-- 🎨 Customizable themes and layouts
-- 💾 Automatic saving and offline support
-- 📅 Calendar view for journal entries
-- 🏷️ Tags and categories for organization
-- 🔍 Full-text search capabilities
+- Secure authentication and data encryption
+- Cross-platform support (Web & Mobile)
+- Rich text editing with modern formatting tools
+- Customizable themes and layouts
+- Automatic saving and offline support
+- Calendar view for journal entries
+- Tags and categories for organization
+- Full-text search capabilities
 
 ## Tech Stack
 
