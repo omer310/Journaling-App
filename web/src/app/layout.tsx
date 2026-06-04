@@ -6,6 +6,7 @@ import { Inter } from "next/font/google";
 import { clerkAppearance } from "@/lib/clerkAppearance";
 import { useStore } from "@/store/useStore";
 import { useEffect, useState, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { RiWifiOffLine } from "react-icons/ri";
 import Link from "next/link";
 import { AuthProvider, useAuth } from "@/components/AuthProvider";
@@ -22,20 +23,12 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const fontSelectorRef = useRef<HTMLDivElement>(null);
   const [showFontSelector, setShowFontSelector] = useState(false);
-  const [selectedFont, setSelectedFont] = useState(() => {
-    // Try to get saved font from localStorage
-    if (typeof window !== "undefined") {
-      const savedFont = localStorage.getItem("soul-pages-font");
-      return savedFont || "Indie Flower";
-    }
-    return "Indie Flower";
-  });
+  // Always start with the default so server and client render the same HTML.
+  // localStorage is loaded after mount in the useEffect below.
+  const [selectedFont, setSelectedFont] = useState("Indie Flower");
 
-  // Check if we're on a login/register page to hide authenticated features
-  const isOnAuthPage = typeof window !== "undefined" && (
-    window.location.pathname === "/login" || 
-    window.location.pathname === "/register"
-  );
+  const pathname = usePathname();
+  const isOnAuthPage = pathname === "/login" || pathname === "/register";
 
   useEffect(() => {
     // Handle click outside to close dropdown
@@ -71,13 +64,18 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
     };
   }, [setOfflineStatus]);
 
-  // Apply selected font on component mount and save to localStorage
+  // On first mount, restore the saved font from localStorage.
+  useEffect(() => {
+    const saved = localStorage.getItem("soul-pages-font");
+    if (saved && saved !== "Indie Flower") {
+      setSelectedFont(saved);
+    }
+  }, []);
+
+  // Apply selected font and persist it whenever it changes.
   useEffect(() => {
     document.documentElement.style.setProperty("--app-font", selectedFont);
-    // Save font preference to localStorage
-    if (typeof window !== "undefined") {
-      localStorage.setItem("soul-pages-font", selectedFont);
-    }
+    localStorage.setItem("soul-pages-font", selectedFont);
   }, [selectedFont]);
 
   // Font options with their display names
