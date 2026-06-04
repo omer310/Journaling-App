@@ -5,6 +5,11 @@
 import sanitizeFilename from 'sanitize-filename';
 import DOMPurify from 'dompurify';
 
+// Derive extra CSP entries for the custom production domain (e.g. soulpages.life).
+// Set NEXT_PUBLIC_APP_DOMAIN=soulpages.life in your hosting env vars.
+const _appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN || '';
+const _appDomainEntries = _appDomain ? [`https://*.${_appDomain}`] : [];
+
 // CSP Configuration
 export const CSP_CONFIG = {
   // Default source restrictions
@@ -19,7 +24,8 @@ export const CSP_CONFIG = {
     "https://www.google-analytics.com",
     "https://*.clerk.accounts.dev",
     "https://*.clerk.com",
-    "https://challenges.cloudflare.com"
+    "https://challenges.cloudflare.com",
+    ..._appDomainEntries,
   ],
   
   // Style sources - allow inline styles and Google Fonts
@@ -51,7 +57,8 @@ export const CSP_CONFIG = {
     "https://*.clerk.accounts.dev",
     "https://*.clerk.com",
     "https://api.clerk.com",
-    "https://clerk-telemetry.com"
+    "https://clerk-telemetry.com",
+    ..._appDomainEntries,
   ],
   
   // Media sources - allow audio/video content
@@ -69,7 +76,8 @@ export const CSP_CONFIG = {
     "'self'",
     "https://*.clerk.accounts.dev",
     "https://*.clerk.com",
-    "https://challenges.cloudflare.com"
+    "https://challenges.cloudflare.com",
+    ..._appDomainEntries,
   ],
   
   // Worker sources - allow service workers

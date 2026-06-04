@@ -69,7 +69,11 @@ function getMongoUri() {
 
 export async function getMongoClient() {
   if (!global.__mongoClientPromise) {
-    global.__mongoClientPromise = new MongoClient(getMongoUri()).connect();
+    global.__mongoClientPromise = new MongoClient(getMongoUri(), {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+      socketTimeoutMS: 10000,
+    }).connect();
   }
   return global.__mongoClientPromise;
 }

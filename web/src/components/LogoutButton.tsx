@@ -13,11 +13,16 @@ export default function LogoutButton() {
 
     try {
       setLoading(true);
+
+      // Fire-and-forget with a 3s cap so a slow/unreachable API never blocks the sign-out.
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
       await fetch('/api/auth/logout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: 'user_initiated' }),
-      }).catch(() => undefined);
+        signal: controller.signal,
+      }).catch(() => undefined).finally(() => clearTimeout(timer));
 
       await signOut({ redirectUrl: '/login' });
     } catch (error) {
