@@ -107,10 +107,13 @@ export function generateCSP(): string {
   return directives.join('; ');
 }
 
+// CSP is intentionally omitted from middleware headers.
+// Setting CSP in Edge middleware causes conflicts with Next.js script loading
+// and Clerk's dynamically-loaded browser JS. Apply CSP via next.config.js headers
+// or meta tags once the domain setup is stable.
 export const SECURITY_HEADERS = {
-  'Content-Security-Policy': generateCSP(),
   'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
+  'X-Frame-Options': 'SAMEORIGIN',
   'X-XSS-Protection': '1; mode=block',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
