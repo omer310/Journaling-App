@@ -1,27 +1,35 @@
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
 import { SECURITY_HEADERS } from '@/lib/security';
 
-export function middleware(request: NextRequest) {
-  const response = NextResponse.next();
+const isProtectedRoute = createRouteMatcher([
+  '/',
+  '/entries(.*)',
+  '/journal(.*)',
+  '/admin(.*)',
+  '/api/auth/validate-session(.*)',
+  '/api/auth/logout(.*)',
+  '/api/journal(.*)',
+  '/api/security/dashboard(.*)',
+]);
 
-  // Apply security headers
+export default clerkMiddleware(async (auth, request) => {
+  if (isProtectedRoute(request)) {
+    await auth.protect();
+  }
+
+  const response = NextResponse.next();
   Object.entries(SECURITY_HEADERS).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
 
   return response;
-}
+});
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/(api|trpc)(.*)',
+    '/__clerk/(.*)',
   ],
-}; 
+};

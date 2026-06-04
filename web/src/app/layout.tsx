@@ -1,7 +1,9 @@
 "use client";
 
 import "./globals.css";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Inter } from "next/font/google";
+import { clerkAppearance } from "@/lib/clerkAppearance";
 import { useStore } from "@/store/useStore";
 import { useEffect, useState, useRef } from "react";
 import { RiWifiOffLine } from "react-icons/ri";
@@ -233,12 +235,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
-        <AuthProvider>
-          <RootLayoutContent>{children}</RootLayoutContent>
-        </AuthProvider>
-      </body>
-    </html>
+    <ClerkProvider appearance={clerkAppearance}>
+      <html lang="en">
+        <body>
+          <AuthProvider>
+            <RootLayoutContent>{children}</RootLayoutContent>
+          </AuthProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

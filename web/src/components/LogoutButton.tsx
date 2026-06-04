@@ -1,37 +1,25 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { useClerk } from '@clerk/nextjs';
 import { RiLogoutBoxLine } from 'react-icons/ri';
 
 export default function LogoutButton() {
-  const router = useRouter();
+  const { signOut } = useClerk();
   const [loading, setLoading] = useState(false);
 
   const handleLogout = async () => {
-    if (loading) {
-      return; // Prevent multiple clicks
-    }
+    if (loading) return;
 
     try {
       setLoading(true);
-      console.log('Logging out...');
-      
-      // Check current session first
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('Current session:', session?.user?.email);
-      
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Supabase signOut error:', error);
-        throw error;
-      }
-      
-      console.log('Sign out successful, redirecting to login...');
-      
-      // Force a hard redirect to login page to ensure clean state
-      window.location.href = '/login';
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'user_initiated' }),
+      }).catch(() => undefined);
+
+      await signOut({ redirectUrl: '/login' });
     } catch (error) {
       console.error('Logout error:', error);
       alert('Failed to log out. Please try again.');
@@ -54,4 +42,4 @@ export default function LogoutButton() {
       )}
     </button>
   );
-} 
+}

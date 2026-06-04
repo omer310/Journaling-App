@@ -24,11 +24,12 @@ export default function ProtectedRoute({
   // Show loading state while auth is being determined
   if (loading) {
     return (
-      <LoadingSpinner 
-        fullScreen 
-        size="large" 
-        text="Authenticating..." 
-      />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <LoadingSpinner 
+          size="large" 
+          text="Authenticating..." 
+        />
+      </div>
     );
   }
 
@@ -61,11 +62,12 @@ export default function ProtectedRoute({
   // Don't render anything if no user (will redirect)
   if (!user) {
     return (
-      <LoadingSpinner 
-        fullScreen 
-        size="large" 
-        text="Redirecting..." 
-      />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <LoadingSpinner 
+          size="large" 
+          text="Redirecting..." 
+        />
+      </div>
     );
   }
 

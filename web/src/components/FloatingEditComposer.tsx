@@ -55,7 +55,7 @@ export function FloatingEditComposer({ isOpen, onClose, entryId, onSave }: Float
         setEntryDate(entry.date || getCurrentTimestamp());
         setLoading(false);
       } else {
-        // If not found in store, try to fetch from Supabase
+        // If not found in store, wait for the Mongo-backed store refresh.
         // This would need to be implemented based on your data fetching logic
         setLoading(false);
       }

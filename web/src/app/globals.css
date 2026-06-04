@@ -596,3 +596,132 @@ html:not(.dark) {
   }
 }
 
+/* Clerk auth surfaces */
+.auth-page-shell {
+  min-height: 100vh;
+  background: var(--background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.auth-page-panel {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.auth-page-brand {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.auth-page-icon {
+  width: 4rem;
+  height: 4rem;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.auth-page-title {
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+  font-weight: 800;
+  color: var(--primary);
+  margin: 0;
+}
+
+.auth-page-subtitle {
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+}
+
+.cl-rootBox,
+.cl-cardBox {
+  width: 100% !important;
+}
+
+.cl-card {
+  width: 100% !important;
+  max-width: 28rem !important;
+  background: color-mix(in srgb, var(--surface) 76%, black) !important;
+  border: 1px solid color-mix(in srgb, var(--border) 85%, white 10%) !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32) !important;
+  color: var(--text-primary) !important;
+}
+
+.cl-header {
+  display: none !important;
+}
+
+.cl-socialButtonsBlockButton,
+.cl-formFieldInput,
+.cl-otpCodeFieldInput {
+  background: color-mix(in srgb, var(--surface) 78%, white 7%) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: none !important;
+}
+
+.cl-socialButtonsBlockButton:hover,
+.cl-formFieldInput:focus,
+.cl-otpCodeFieldInput:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent) !important;
+}
+
+.cl-formButtonPrimary {
+  background: var(--primary) !important;
+  border-radius: 0.75rem !important;
+  color: white !important;
+  font-weight: 700 !important;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--primary) 24%, transparent) !important;
+}
+
+.cl-formButtonPrimary:hover,
+.cl-formButtonPrimary:focus {
+  background: var(--primary-dark) !important;
+}
+
+.cl-formFieldLabel,
+.cl-socialButtonsBlockButtonText,
+.cl-formFieldInput::placeholder,
+.cl-dividerText,
+.cl-footerActionText,
+.cl-identityPreviewText,
+.cl-formHeaderTitle,
+.cl-formHeaderSubtitle {
+  color: var(--text-primary) !important;
+}
+
+.cl-formFieldInput::placeholder,
+.cl-dividerText,
+.cl-footerActionText,
+.cl-formHeaderSubtitle {
+  color: var(--text-secondary) !important;
+}
+
+.cl-footerActionLink,
+.cl-formResendCodeLink,
+.cl-identityPreviewEditButton {
+  color: var(--primary) !important;
+}
+
+.cl-footer,
+.cl-footerPages,
+.cl-footerAction {
+  background: color-mix(in srgb, var(--surface) 70%, black) !important;
+  border-color: var(--border) !important;
+}
+
+.cl-internal-17ydaof,
+.cl-internal-1dauvpw {
+  display: none !important;
+}

@@ -16,7 +16,10 @@ export const CSP_CONFIG = {
     "'unsafe-eval'", // Required for Next.js development
     "'unsafe-inline'", // Required for Next.js
     "https://www.googletagmanager.com",
-    "https://www.google-analytics.com"
+    "https://www.google-analytics.com",
+    "https://*.clerk.accounts.dev",
+    "https://*.clerk.com",
+    "https://challenges.cloudflare.com"
   ],
   
   // Style sources - allow inline styles and Google Fonts
@@ -42,12 +45,13 @@ export const CSP_CONFIG = {
     "blob:"
   ],
   
-  // Connect sources - allow API calls to Supabase and other services
+  // Connect sources - allow app API calls and Clerk auth endpoints
   connectSrc: [
     "'self'",
-    "https://*.supabase.co",
-    "https://api.supabase.com",
-    "wss://*.supabase.co"
+    "https://*.clerk.accounts.dev",
+    "https://*.clerk.com",
+    "https://api.clerk.com",
+    "https://clerk-telemetry.com"
   ],
   
   // Media sources - allow audio/video content
@@ -61,7 +65,12 @@ export const CSP_CONFIG = {
   objectSrc: ["'none'"],
   
   // Frame sources - allow embedding in trusted sources
-  frameSrc: ["'self'"],
+  frameSrc: [
+    "'self'",
+    "https://*.clerk.accounts.dev",
+    "https://*.clerk.com",
+    "https://challenges.cloudflare.com"
+  ],
   
   // Worker sources - allow service workers
   workerSrc: [

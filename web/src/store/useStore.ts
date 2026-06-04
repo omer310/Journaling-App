@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { supabase } from '@/lib/supabase';
 import { encryptData, decryptData, isEncrypted } from '@/lib/encryption';
 import { normalizeDateForStorage, normalizeDateForDisplay, normalizeDateForMobileEntry } from '@/lib/dateUtils';
+import { getCurrentUserId, requireCurrentUserId } from '@/lib/clientAuthState';
 
 // Create a custom storage that checks for window/localStorage availability
 const customStorage = {
@@ -38,6 +38,74 @@ interface JournalEntry {
   userId?: string;
   source?: 'web' | 'mobile';
   mood?: 'happy' | 'neutral' | 'sad';
+}
+
+interface RemoteJournalEntry {
+  id: string;
+  title: string;
+  content: string;
+  date: string;
+  tags?: string[];
+  user_id: string;
+  encryption_user_id?: string;
+  source?: 'web' | 'mobile';
+  last_modified: string;
+  mood?: 'happy' | 'neutral' | 'sad';
+}
+
+async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options?.headers || {}),
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || 'Request failed');
+  }
+
+  return data as T;
+}
+
+async function decryptRemoteEntry(entry: RemoteJournalEntry): Promise<JournalEntry> {
+  try {
+    const [title, content] = await Promise.all([
+      isEncrypted(entry.title) ? decryptData(entry.title, entry.encryption_user_id) : Promise.resolve(entry.title),
+      isEncrypted(entry.content) ? decryptData(entry.content, entry.encryption_user_id) : Promise.resolve(entry.content)
+    ]);
+
+    const normalizedDate = entry.source === 'mobile'
+      ? normalizeDateForMobileEntry(entry.date)
+      : normalizeDateForStorage(entry.date);
+
+    return {
+      id: entry.id,
+      title: title || '',
+      content: content || '',
+      date: normalizedDate,
+      tags: Array.isArray(entry.tags) ? entry.tags : [],
+      lastModified: entry.last_modified,
+      userId: entry.user_id,
+      source: entry.source,
+      mood: entry.mood,
+    };
+  } catch (error) {
+    console.error('Error decrypting entry:', error);
+    return {
+      id: entry.id,
+      title: '[Encrypted Entry]',
+      content: 'This entry could not be decrypted. It may have been created with a different encryption method.',
+      date: entry.date,
+      tags: Array.isArray(entry.tags) ? entry.tags : [],
+      lastModified: entry.last_modified,
+      userId: entry.user_id,
+      source: entry.source,
+      mood: entry.mood,
+    };
+  }
 }
 
 interface Theme {
@@ -177,6 +245,12 @@ export const useStore = create<AppState>()(
       entriesLoading: false,
       setEntries: (entries) => set({ entries }),
       fetchEntries: async () => {
+        const userId = getCurrentUserId();
+        if (!userId) {
+          set({ entriesLoading: false });
+          return;
+        }
+
         const CACHE_DURATION = 30000; // 30 seconds cache
         const currentTime = Date.now();
         const { lastFetchTime, cachedEntries } = get();
@@ -196,104 +270,30 @@ export const useStore = create<AppState>()(
         const attemptFetch = async (): Promise<void> => {
           try {
             set({ entriesLoading: true, lastSyncTime: null });
-            
-            // Check authentication with timeout
-            const authPromise = supabase.auth.getUser();
-            const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Authentication timeout')), 10000)
-            );
-            
-            const { data: { user }, error: authError } = await Promise.race([
-              authPromise,
-              timeoutPromise
-            ]) as { data: { user: any }, error: any };
-
-            if (authError) {
-              throw authError;
-            }
-
-            if (!user) {
-              console.log('No user authenticated, skipping fetch');
-              set({ entriesLoading: false });
-              return;
-            }
-
-            // Fetch entries with limit for better performance
-            const { data: entries, error } = await supabase
-              .from('journal_entries')
-              .select('*')
-              .eq('user_id', user.id)
-              .order('last_modified', { ascending: false })
-              .limit(1000); // Add reasonable limit
-
-            if (error) {
-              console.error('Error fetching entries:', error);
-              throw error;
-            }
-
-            if (!entries) {
-              throw new Error('No entries returned from database');
-            }
 
             // OPTIMIZATION: Parallel decryption instead of sequential
-            const decryptionPromises = entries.map(async (entry: any) => {
-              try {
-                // Decrypt title and content in parallel
-                const [title, content] = await Promise.all([
-                  isEncrypted(entry.title) ? decryptData(entry.title) : Promise.resolve(entry.title),
-                  isEncrypted(entry.content) ? decryptData(entry.content) : Promise.resolve(entry.content)
-                ]);
+            const { entries } = await apiRequest<{ entries: RemoteJournalEntry[] }>('/api/journal/entries');
+            const decryptionPromises = entries.map(async (entry) => {
+              const entryTags = Array.isArray(entry.tags) ? entry.tags : [];
+              const { tags: existingTags } = get();
+              const missingTagIds = entryTags.filter((tagId: string) => 
+                !existingTags.find(tag => tag.id === tagId)
+              );
 
-                // Handle missing tag definitions for mobile entries
-                const entryTags = Array.isArray(entry.tags) ? entry.tags : [];
-                const { tags: existingTags } = get();
-                const missingTagIds = entryTags.filter((tagId: string) => 
-                  !existingTags.find(tag => tag.id === tagId)
-                );
-
-                // Create missing tag definitions for mobile entries
-                if (missingTagIds.length > 0 && entry.source === 'mobile') {
-                  const newTags = missingTagIds.map((tagId: string) => ({
-                    id: tagId,
-                    name: `Mobile Tag ${missingTagIds.indexOf(tagId) + 1}`,
-                    color: `hsl(${Math.random() * 360}, 70%, 50%)`,
-                  }));
-                  
-                  set((state) => ({
-                    tags: [...state.tags, ...newTags]
-                  }));
-                }
-
-                // Normalize the date to ensure consistent timezone handling
-                const normalizedDate = entry.source === 'mobile' 
-                  ? normalizeDateForMobileEntry(entry.date)
-                  : normalizeDateForStorage(entry.date);
+              // Create missing tag definitions for mobile entries
+              if (missingTagIds.length > 0 && entry.source === 'mobile') {
+                const newTags = missingTagIds.map((tagId: string) => ({
+                  id: tagId,
+                  name: `Mobile Tag ${missingTagIds.indexOf(tagId) + 1}`,
+                  color: `hsl(${Math.random() * 360}, 70%, 50%)`,
+                }));
                 
-                return {
-                  id: entry.id,
-                  title: title || '',
-                  content: content || '',
-                  date: normalizedDate,
-                  tags: entryTags,
-                  lastModified: entry.last_modified,
-                  userId: entry.user_id,
-                  source: entry.source,
-                  mood: entry.mood,
-                };
-              } catch (error) {
-                console.error('Error decrypting entry:', error);
-                return {
-                  id: entry.id,
-                  title: '[Encrypted Entry]',
-                  content: 'This entry could not be decrypted. It may have been created with a different encryption method.',
-                  date: entry.date,
-                  tags: Array.isArray(entry.tags) ? entry.tags : [],
-                  lastModified: entry.last_modified,
-                  userId: entry.user_id,
-                  source: entry.source,
-                  mood: entry.mood,
-                };
+                set((state) => ({
+                  tags: [...state.tags, ...newTags]
+                }));
               }
+
+              return decryptRemoteEntry(entry);
             });
 
             // Wait for all decryptions to complete
@@ -336,10 +336,7 @@ export const useStore = create<AppState>()(
       },
       addEntry: async (entry) => {
         try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) {
-            throw new Error('User not authenticated');
-          }
+          const userId = requireCurrentUserId();
 
           // Create a temporary ID for optimistic update
           const tempId = crypto.randomUUID();
@@ -356,7 +353,7 @@ export const useStore = create<AppState>()(
             date: normalizedDate,
             tags: entry.tags || [],
             lastModified: now,
-            userId: user.id,
+            userId,
             source: 'web',
             mood: entry.mood,
           };
@@ -375,7 +372,7 @@ export const useStore = create<AppState>()(
             content: await encryptData(entry.content.trim()),
             date: normalizedDate,
             tags: entry.tags || [],
-            user_id: user.id,
+            encryption_user_id: userId,
             source: 'web' as const,
             last_modified: now,
           };
@@ -385,21 +382,18 @@ export const useStore = create<AppState>()(
             Object.assign(entryData, { mood: entry.mood });
           }
 
-          const { data: savedEntry, error } = await supabase
-            .from('journal_entries')
-            .insert(entryData)
-            .select()
-            .single();
-
-          if (error) {
-            console.error('Supabase error:', error);
+          const { entry: savedEntry } = await apiRequest<{ entry: RemoteJournalEntry }>('/api/journal/entries', {
+            method: 'POST',
+            body: JSON.stringify(entryData),
+          }).catch((error) => {
+            console.error('MongoDB API error:', error);
             // Revert optimistic update on error
             set((state) => ({
               entries: state.entries.filter(e => e.id !== tempId),
               cachedEntries: state.cachedEntries.filter(e => e.id !== tempId)
             }));
             throw error;
-          }
+          });
 
           // Update the entry with the real ID from the database
           if (savedEntry) {
@@ -429,10 +423,7 @@ export const useStore = create<AppState>()(
       },
       updateEntry: async (id, entry) => {
         try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) {
-            throw new Error('User not authenticated');
-          }
+          requireCurrentUserId();
 
           const now = new Date().toISOString();
 
@@ -464,9 +455,11 @@ export const useStore = create<AppState>()(
           // Encrypt fields that need encryption
           if (entry.title !== undefined) {
             updatedEntry.title = await encryptData(entry.title.trim());
+            updatedEntry.encryption_user_id = requireCurrentUserId();
           }
           if (entry.content !== undefined) {
             updatedEntry.content = await encryptData(entry.content.trim());
+            updatedEntry.encryption_user_id = requireCurrentUserId();
           }
 
           // Copy other fields as is
@@ -474,21 +467,18 @@ export const useStore = create<AppState>()(
           if (entry.mood !== undefined) updatedEntry.mood = entry.mood;
           if (entry.date !== undefined) updatedEntry.date = normalizeDateForStorage(entry.date);
 
-          const { error } = await supabase
-            .from('journal_entries')
-            .update(updatedEntry)
-            .eq('id', id)
-            .eq('user_id', user.id);
-
-          if (error) {
-            console.error('Supabase error:', error);
+          await apiRequest<{ entry: RemoteJournalEntry }>(`/api/journal/entries/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(updatedEntry),
+          }).catch((error) => {
+            console.error('MongoDB API error:', error);
             // Revert optimistic update on error
             set((state) => ({
               entries: state.entries.map(e => e.id === id ? existingEntry : e),
               cachedEntries: state.cachedEntries.map(e => e.id === id ? existingEntry : e)
             }));
             throw error;
-          }
+          });
 
           // No need to refresh entries since we already have the latest state
         } catch (error) {
@@ -498,10 +488,7 @@ export const useStore = create<AppState>()(
       },
       removeEntry: async (id) => {
         try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) {
-            throw new Error('User not authenticated');
-          }
+          requireCurrentUserId();
 
           // Optimistic update - remove from local state immediately
           const currentState = get();
@@ -514,14 +501,10 @@ export const useStore = create<AppState>()(
             lastSyncTime: new Date().toISOString()
           }));
 
-          const { error } = await supabase
-            .from('journal_entries')
-            .delete()
-            .eq('id', id)
-            .eq('user_id', user.id);
-
-          if (error) {
-            console.error('Supabase error:', error);
+          await apiRequest<{ success: boolean }>(`/api/journal/entries/${id}`, {
+            method: 'DELETE',
+          }).catch((error) => {
+            console.error('MongoDB API error:', error);
             // Revert optimistic update on error
             if (entryToDelete) {
               set((state) => ({
@@ -532,7 +515,7 @@ export const useStore = create<AppState>()(
               }));
             }
             throw error;
-          }
+          });
 
           // Success - no need to refresh entries since we already updated the state
         } catch (error) {
@@ -542,10 +525,7 @@ export const useStore = create<AppState>()(
       },
       removeMultipleEntries: async (ids) => {
         try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) {
-            throw new Error('User not authenticated');
-          }
+          requireCurrentUserId();
 
           // Optimistic update - remove from local state immediately
           const currentState = get();
@@ -558,15 +538,11 @@ export const useStore = create<AppState>()(
             lastSyncTime: new Date().toISOString()
           }));
 
-          // Delete multiple entries in a single query
-          const { error } = await supabase
-            .from('journal_entries')
-            .delete()
-            .in('id', ids)
-            .eq('user_id', user.id);
-
-          if (error) {
-            console.error('Supabase error:', error);
+          await apiRequest<{ success: boolean }>('/api/journal/entries', {
+            method: 'DELETE',
+            body: JSON.stringify({ ids }),
+          }).catch((error) => {
+            console.error('MongoDB API error:', error);
             // Revert optimistic update on error
             set((state) => ({
               entries: [...entriesToDelete, ...state.entries],
@@ -575,7 +551,7 @@ export const useStore = create<AppState>()(
               lastSyncTime: new Date().toISOString()
             }));
             throw error;
-          }
+          });
 
           // Success - no need to refresh entries since we already updated the state
         } catch (error) {
@@ -615,21 +591,11 @@ export const useStore = create<AppState>()(
       // Data cleanup
       cleanupCorruptedEntries: async () => {
         try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) {
-            throw new Error('User not authenticated');
-          }
-
-          // Get all entries for the user
-          const { data: entries, error } = await supabase
-            .from('journal_entries')
-            .select('*')
-            .eq('user_id', user.id);
-
-          if (error) {
-            console.error('Error fetching entries for cleanup:', error);
+          if (!getCurrentUserId()) {
             return;
           }
+
+          const { entries } = await apiRequest<{ entries: RemoteJournalEntry[] }>('/api/journal/entries');
 
           let cleanedCount = 0;
           for (const entry of entries || []) {
@@ -643,17 +609,13 @@ export const useStore = create<AppState>()(
               }
             } catch (error) {
               console.log('Found corrupted entry:', entry.id);
-              // Delete the corrupted entry
-              const { error: deleteError } = await supabase
-                .from('journal_entries')
-                .delete()
-                .eq('id', entry.id)
-                .eq('user_id', user.id);
-
-              if (deleteError) {
-                console.error('Error deleting corrupted entry:', deleteError);
-              } else {
+              try {
+                await apiRequest<{ success: boolean }>(`/api/journal/entries/${entry.id}`, {
+                  method: 'DELETE',
+                });
                 cleanedCount++;
+              } catch (deleteError) {
+                console.error('Error deleting corrupted entry:', deleteError);
               }
             }
           }
@@ -670,40 +632,12 @@ export const useStore = create<AppState>()(
       // Background cache refresh
       refreshCacheInBackground: async () => {
         try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) return;
-
-          const { data: entries, error } = await supabase
-            .from('journal_entries')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('last_modified', { ascending: false });
-
-          if (error || !entries) return;
-
-          const decryptedEntries: JournalEntry[] = [];
-          const { tags: existingTags } = get();
-          
-          for (const entry of entries) {
-            try {
-              const title = isEncrypted(entry.title) ? await decryptData(entry.title) : entry.title;
-              const content = isEncrypted(entry.content) ? await decryptData(entry.content) : entry.content;
-
-              decryptedEntries.push({
-                id: entry.id,
-                title: title || '',
-                content: content || '',
-                date: entry.date,
-                tags: Array.isArray(entry.tags) ? entry.tags : [],
-                lastModified: entry.last_modified,
-                userId: entry.user_id,
-                source: entry.source,
-                mood: entry.mood,
-              });
-            } catch (error) {
-              console.error('Error decrypting entry in background refresh:', error);
-            }
+          if (!getCurrentUserId()) {
+            return;
           }
+
+          const { entries } = await apiRequest<{ entries: RemoteJournalEntry[] }>('/api/journal/entries');
+          const decryptedEntries = await Promise.all(entries.map(decryptRemoteEntry));
 
           // Silently update cache
           set({ 
@@ -730,58 +664,5 @@ export const useStore = create<AppState>()(
   )
 );
 
-// Set up Supabase sync - moved to AuthProvider to avoid race conditions
-let currentChannel: any = null;
-let realtimeUpdateTimeout: NodeJS.Timeout | null = null;
-
-// Function to set up real-time subscription
-export const setupRealtimeSubscription = async (userId: string) => {
-  if (currentChannel) {
-    supabase.removeChannel(currentChannel);
-  }
-
-  currentChannel = supabase
-    .channel('journal_entries')
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'journal_entries',
-        filter: `user_id=eq.${userId}`,
-      },
-      async (payload) => {
-        // Clear any existing timeout
-        if (realtimeUpdateTimeout) {
-          clearTimeout(realtimeUpdateTimeout);
-        }
-        
-        // Debounce real-time updates to prevent excessive refreshes
-        realtimeUpdateTimeout = setTimeout(async () => {
-          try {
-            const store = useStore.getState();
-            if (!store.entriesLoading) {
-              await store.fetchEntries();
-            }
-          } catch (error) {
-            console.error('Error fetching entries after real-time update:', error);
-          }
-        }, 500); // Reduced delay for better responsiveness
-      }
-    )
-    .subscribe((status) => {
-      // Real-time subscription status tracking
-    });
-};
-
-// Function to cleanup real-time subscription
-export const cleanupRealtimeSubscription = () => {
-  if (currentChannel) {
-    supabase.removeChannel(currentChannel);
-    currentChannel = null;
-  }
-  if (realtimeUpdateTimeout) {
-    clearTimeout(realtimeUpdateTimeout);
-    realtimeUpdateTimeout = null;
-  }
-}; 
+export const setupRealtimeSubscription = async (_userId: string) => undefined;
+export const cleanupRealtimeSubscription = () => undefined;

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import { RiShieldLine, RiAlertLine, RiUserLine, RiTimeLine, RiMapPinLine, RiLockLine } from 'react-icons/ri';
 
 interface SecurityEvent {
@@ -80,35 +79,21 @@ export default function SecurityDashboard() {
 
   const fetchSecurityData = async () => {
     try {
-      // Fetch security events
-      const { data: events, error: eventsError } = await supabase
-        .from('security_events')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(50);
-
-      if (eventsError) {
-        console.error('Error fetching security events:', eventsError);
-      } else {
-        setSecurityEvents(events || []);
+      const response = await fetch('/api/security/dashboard');
+      if (!response.ok) {
+        throw new Error('Failed to fetch security data');
       }
 
-      // Fetch user sessions
-      const { data: sessions, error: sessionsError } = await supabase
-        .from('user_sessions')
-        .select('*')
-        .eq('active', true)
-        .order('last_activity', { ascending: false });
-
-      if (sessionsError) {
-        console.error('Error fetching user sessions:', sessionsError);
-      } else {
-        setUserSessions(sessions || []);
-      }
+      const {
+        events = [],
+        sessions = [],
+      }: { events: SecurityEvent[]; sessions: UserSession[] } = await response.json();
+      setSecurityEvents(events);
+      setUserSessions(sessions);
 
       // Calculate stats
-      const criticalCount = (events || []).filter(e => e.severity === 'CRITICAL').length;
-      const suspiciousCount = (events || []).filter(e => 
+      const criticalCount = (events || []).filter((e: SecurityEvent) => e.severity === 'CRITICAL').length;
+      const suspiciousCount = (events || []).filter((e: SecurityEvent) => 
         e.event_type === 'FAILED_LOGIN' || e.event_type === 'SUSPICIOUS_ACTIVITY'
       ).length;
 

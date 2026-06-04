@@ -1,6 +1,5 @@
 
 import { useEffect, useRef, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
 import { 
   getLastActivityTime, 
   updateLastActivityTime, 
@@ -48,8 +47,11 @@ export function useInactivityTimer({
       if (onTimeout) {
         onTimeout();
       } else {
-        // Default behavior: sign out
-        await supabase.auth.signOut();
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'inactivity_timeout' }),
+        }).catch(() => undefined);
         // Force redirect to login page
         window.location.href = '/login?reason=Session expired due to inactivity';
       }

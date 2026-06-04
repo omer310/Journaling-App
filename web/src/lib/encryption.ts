@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { requireCurrentUserId } from './clientAuthState';
 
 function str2ab(str: string): ArrayBuffer {
   const buf = new ArrayBuffer(str.length);
@@ -38,10 +38,7 @@ async function generateKey(userId: string): Promise<CryptoKey> {
 }
 
 export async function encryptData(data: string): Promise<string> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('User not authenticated');
-
-  const key = await generateKey(user.id);
+  const key = await generateKey(requireCurrentUserId());
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const encoder = new TextEncoder();
 
@@ -61,9 +58,8 @@ export async function encryptData(data: string): Promise<string> {
   return btoa(ab2str(combined.buffer));
 }
 
-export async function decryptData(encryptedData: string): Promise<string> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('User not authenticated');
+export async function decryptData(encryptedData: string, encryptionUserId?: string): Promise<string> {
+  const userId = encryptionUserId || requireCurrentUserId();
 
   // Check if data is actually encrypted
   if (!isEncrypted(encryptedData)) {
@@ -72,7 +68,7 @@ export async function decryptData(encryptedData: string): Promise<string> {
 
   // First try web encryption (AES-GCM)
   try {
-    const key = await generateKey(user.id);
+    const key = await generateKey(userId);
     const decoder = new TextDecoder();
 
     const combined = new Uint8Array(str2ab(atob(encryptedData)));
@@ -98,7 +94,7 @@ export async function decryptData(encryptedData: string): Promise<string> {
   } catch (error) {
     // If web encryption fails, try mobile encryption
     try {
-      return await decryptMobileData(encryptedData, user.id);
+      return await decryptMobileData(encryptedData, userId);
     } catch (mobileError) {
       console.error('Failed to decrypt data with both methods:', { web: error, mobile: mobileError });
       throw new Error('Failed to decrypt data');

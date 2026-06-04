@@ -12,7 +12,6 @@ import { FloatingComposer, FloatingEditComposer, MotivationBanner, StreakWidget,
 import { ImmersiveView } from '@/components/ImmersiveView';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { normalizeDateForDisplay } from '@/lib/dateUtils';
-import { supabase } from '@/lib/supabase';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import dayjs from 'dayjs';
 import {
@@ -142,9 +141,7 @@ export default function Dashboard() {
 
   const handleSaveEntry = async (entryData: any) => {
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
+      if (!user) {
         throw new Error('Authentication error');
       }
 
@@ -157,9 +154,7 @@ export default function Dashboard() {
 
   const handleSaveEditEntry = async (entryData: any) => {
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
+      if (!user) {
         throw new Error('Authentication error');
       }
 

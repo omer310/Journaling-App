@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { Tags } from '@/components/Tags';
 import { useStore } from '@/store/useStore';
-import { supabase } from '@/lib/supabase';
 
 export default function EditJournalForm({ id }: { id: string }) {
   const router = useRouter();
@@ -39,18 +38,6 @@ export default function EditJournalForm({ id }: { id: string }) {
     setError('');
 
     try {
-      // First, let's check if the user is authenticated
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError) {
-        console.error('Auth error:', authError);
-        throw new Error('Authentication error: ' + authError.message);
-      }
-      
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
       await updateEntry(id, {
         title: title.trim(),
         content: content.trim(),
